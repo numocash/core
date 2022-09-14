@@ -134,7 +134,7 @@ contract AccrueInterestTest is TestHelper, MintCallbackHelper {
         assertEq(next, bytes32(0));
         assertEq(previous, bytes32(0));
         assertEq(liquidity, 2 ether);
-        // assertEq(tokensOwed, dilution);
+        assertEq(tokensOwed, dilution * 10);
         assertEq(rewardPerTokenPaid, (dilution * 10 * 1 ether) / (0.1 ether));
         assertEq(utilized, true);
 

@@ -217,8 +217,6 @@ contract Lendgine is ERC20 {
 
         positions.remove(id);
 
-        // uint256 tokensOwed = newTokensOwed(existing);
-
         positions.append(
             id,
             lastPosition,
@@ -363,6 +361,14 @@ contract Lendgine is ERC20 {
         return abi.decode(data, (uint256));
     }
 
+    function speculativeForLP(uint256 _lpAmount) public view returns (uint256) {
+        return (2 * _lpAmount * upperBound) / 1 ether;
+    }
+
+    function lpForSpeculative(uint256 _speculativeAmount) public view returns (uint256) {
+        return (_speculativeAmount * 1 ether) / (2 * upperBound);
+    }
+
     /*//////////////////////////////////////////////////////////////
                             INTERNAL LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -439,7 +445,7 @@ contract Lendgine is ERC20 {
                 remainingLP -= remainingCurrentLiquidity;
                 remainingCurrentLiquidity = currentPositionInfo.liquidity;
 
-                // _accrueMakerInterest(currentId);
+                _accrueMakerInterest(currentId);
             }
         }
         if (remainingCurrentLiquidity == remainingLP) positions[currentId].utilized = false;
@@ -470,10 +476,10 @@ contract Lendgine is ERC20 {
 
         rewardPerTokenStored += (dilutionSpeculative * 1 ether) / totalLPUtilized;
 
+        _accrueMakerInterest(currentPosition);
+
         decreaseCurrentLiquidity(dilutionLP);
         totalLPUtilized -= dilutionLP;
-
-        // Distribute to makers
 
         // // TODO: dilution > baseReserves;
         lastUpdate = uint40(block.timestamp);
@@ -488,7 +494,7 @@ contract Lendgine is ERC20 {
 
         if (!_position.utilized) revert UnutilizedAccrueError();
 
-        uint256 tokensOwed = newTokensOwed(_position);
+        uint256 tokensOwed = newTokensOwed(_position, id);
 
         position.rewardPerTokenPaid = rewardPerTokenStored;
         position.tokensOwed = _position.tokensOwed + tokensOwed;
@@ -497,22 +503,13 @@ contract Lendgine is ERC20 {
     }
 
     /// @dev Assumes reward per token stored is up to date
-    function newTokensOwed(Position.Info memory position) private view returns (uint256) {
-        // TODO: when maker liquidity is partially utilized
+    function newTokensOwed(Position.Info memory position, bytes32 id) private view returns (uint256) {
         if (!position.utilized) return 0;
-        uint256 owed = (position.liquidity * (rewardPerTokenStored - position.rewardPerTokenPaid)) / 1 ether;
+        uint256 liquidity = position.liquidity;
+        if (currentPosition == id) {
+            liquidity = currentLiquidity;
+        }
+        uint256 owed = (liquidity * (rewardPerTokenStored - position.rewardPerTokenPaid)) / 1 ether;
         return owed;
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            NEW LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    function speculativeForLP(uint256 _lpAmount) public view returns (uint256) {
-        return (2 * _lpAmount * upperBound) / 1 ether;
-    }
-
-    function lpForSpeculative(uint256 _speculativeAmount) public view returns (uint256) {
-        return (_speculativeAmount * 1 ether) / (2 * upperBound);
     }
 }
