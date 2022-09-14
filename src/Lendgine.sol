@@ -108,7 +108,7 @@ contract Lendgine is ERC20 {
                                CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
-    constructor() ERC20("Numoen Lendgine", "NLNDG", 18) {
+    constructor() ERC20("Numoen Lendgine", "NLDG", 18) {
         factory = msg.sender;
 
         (speculativeToken, lpToken, upperBound) = Factory(msg.sender).parameters();
@@ -223,7 +223,7 @@ contract Lendgine is ERC20 {
             id,
             lastPosition,
             Position.Info({
-                liquidity: amountLP,
+                liquidity: existing.liquidity + amountLP,
                 tokensOwed: existing.tokensOwed,
                 rewardPerTokenPaid: rewardPerTokenStored,
                 next: bytes32(0),
