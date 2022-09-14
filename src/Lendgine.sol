@@ -306,28 +306,28 @@ contract Lendgine is ERC20 {
         emit BurnMaker(msg.sender, recipient, amountLP);
     }
 
-    // function accrueInterest() external lock {
-    //     _accrueInterest();
-    // }
+    function accrueInterest() external lock {
+        _accrueInterest();
+    }
 
-    // function accrueMakerInterest(bytes32 id) external lock {
-    //     _accrueInterest();
-    //     _accrueMakerInterest(id);
-    // }
+    function accrueMakerInterest(bytes32 id) external lock {
+        _accrueInterest();
+        _accrueMakerInterest(id);
+    }
 
-    // function collectMaker(address recipient) external lock returns (uint256 collectedTokens) {
-    //     Position.Info storage position = positions.get(msg.sender);
+    function collectMaker(address recipient) external lock returns (uint256 collectedTokens) {
+        Position.Info storage position = positions.get(msg.sender);
 
-    //     collectedTokens = position.tokensOwed;
+        collectedTokens = position.tokensOwed;
 
-    //     if (collectedTokens == 0) revert InsufficientOutputError();
+        if (collectedTokens == 0) revert InsufficientOutputError();
 
-    //     position.tokensOwed = 0;
+        position.tokensOwed = 0;
 
-    //     SafeTransferLib.safeTransfer(ERC20(base), recipient, collectedTokens);
+        SafeTransferLib.safeTransfer(ERC20(speculativeToken), recipient, collectedTokens);
 
-    //     emit Collect(msg.sender, recipient, collectedTokens);
-    // }
+        emit Collect(msg.sender, recipient, collectedTokens);
+    }
 
     /*//////////////////////////////////////////////////////////////
                                 VIEW
@@ -449,141 +449,52 @@ contract Lendgine is ERC20 {
         currentLiquidity = remainingCurrentLiquidity - remainingLP;
     }
 
-    // function _accrueInterest() private {
-    //     if (totalSupply == 0) {
-    //         lastUpdate = uint40(block.timestamp);
-    //         return;
-    //     }
+    function _accrueInterest() private {
+        if (totalSupply == 0) {
+            lastUpdate = uint40(block.timestamp);
+            return;
+        }
 
-    //     uint256 timeElapsed = block.timestamp - lastUpdate;
-    //     if (timeElapsed == 0 || baseReserves() == 0) return;
+        uint256 timeElapsed = block.timestamp - lastUpdate;
+        if (timeElapsed == 0 || totalLPUtilized == 0) return;
 
-    //     // calculate how much must be removed
-    //     uint256 dilutionBase = (baseReserves() * RATE * timeElapsed) / (1 days * 10_000);
-    //     uint256 dilutionSpeculative = baseToSpeculative(dilutionBase);
-    //     uint256 lpDilution = lpForInput(dilutionBase, dilutionSpeculative);
+        // calculate how much must be removed
+        uint256 dilutionLP = (totalLPUtilized * RATE * timeElapsed) / (1 days * 10_000);
+        uint256 dilutionSpeculative = speculativeForLP(dilutionLP);
 
-    //     decreaseCurrentLiquidity(lpDilution, dilutionSpeculative);
+        decreaseCurrentLiquidity(dilutionLP);
 
-    //     // Distribute to makers
-    //     rewardPerTokenStored += (dilutionBase * 1 ether) / pairLPAmount();
+        // Distribute to makers
+        rewardPerTokenStored += (dilutionSpeculative * 1 ether) / totalLPUtilized;
 
-    //     // // TODO: dilution > baseReserves;
-    //     lastUpdate = uint40(block.timestamp);
+        // // TODO: dilution > baseReserves;
+        lastUpdate = uint40(block.timestamp);
 
-    //     Pair(pair).transfer(pair, lpDilution);
-    //     (uint256 amountBaseReceived, uint256 amountSpeculativeReceived) = Pair(pair).burn(address(this));
+        emit AccrueInterest();
+    }
 
-    //     if (amountBaseReceived != dilutionBase || amountSpeculativeReceived != dilutionSpeculative) revert();
+    /// @dev assume global interest accrual is up to date
+    function _accrueMakerInterest(bytes32 id) private {
+        Position.Info storage position = positions[id];
+        Position.Info memory _position = position;
 
-    //     emit AccrueInterest();
-    // }
+        if (!_position.utilized) revert UnutilizedAccrueError();
 
-    // /// @dev assume global interest accrual is up to date
-    // function _accrueMakerInterest(bytes32 id) private {
-    //     Position.Info storage position = positions[id];
-    //     Position.Info memory _position = position;
+        uint256 tokensOwed = newTokensOwed(_position);
 
-    //     if (!_position.utilized) revert UnutilizedAccrueError();
+        position.rewardPerTokenPaid = rewardPerTokenStored;
+        position.tokensOwed = _position.tokensOwed + tokensOwed;
 
-    //     uint256 tokensOwed = newTokensOwed(_position);
+        emit AccrueMakerInterest();
+    }
 
-    //     position.rewardPerTokenPaid = rewardPerTokenStored;
-    //     position.tokensOwed = _position.tokensOwed + tokensOwed;
-
-    //     emit AccrueMakerInterest();
-    // }
-
-    // /// @dev Assumes reward per token stored is up to date
-    // function newTokensOwed(Position.Info memory position) private view returns (uint256) {
-    //     // TODO: when maker liquidity is partially utilized
-    //     if (!position.utilized) return 0;
-    //     uint256 owed = (position.liquidity * (rewardPerTokenStored - position.rewardPerTokenPaid)) / 1 ether;
-    //     return owed;
-    // }
-
-    /*//////////////////////////////////////////////////////////////
-                               PAIR VIEW
-    //////////////////////////////////////////////////////////////*/
-
-    // function pairLPAmount() public view returns (uint256) {
-    //     return Pair(pair).balanceOf(address(this));
-    // }
-
-    // function pairReserves() public view returns (uint256, uint256) {
-    //     uint256 lpAmount = pairLPAmount();
-    //     uint256 _totalSupply = Pair(pair).totalSupply();
-    //     if (_totalSupply == 0) return (0, 0);
-    //     (uint256 _balanceBase, uint256 _balanceSpeculative) = Pair(pair).balances();
-    //     return ((lpAmount * _balanceBase) / _totalSupply, (lpAmount * _balanceSpeculative) / _totalSupply);
-    // }
-
-    // function baseReserves() public view returns (uint256) {
-    //     (uint256 _baseReserves, ) = pairReserves();
-    //     return _baseReserves;
-    // }
-
-    // function speculativeReserves() public view returns (uint256) {
-    //     (, uint256 _speculativeReserves) = pairReserves();
-    //     return _speculativeReserves;
-    // }
-
-    // function pairBalances() public view returns (uint256, uint256) {
-    //     bool success;
-    //     bytes memory data;
-
-    //     (success, data) = base.staticcall(abi.encodeWithSelector(bytes4(keccak256(bytes("balanceOf(address)"))), pair));
-    //     if (!success || data.length < 32) revert BalanceReturnError();
-    //     uint256 balance0 = abi.decode(data, (uint256));
-
-    //     (success, data) = speculative.staticcall(
-    //         abi.encodeWithSelector(bytes4(keccak256(bytes("balanceOf(address)"))), pair)
-    //     );
-    //     if (!success || data.length < 32) revert BalanceReturnError();
-
-    //     return (balance0, abi.decode(data, (uint256)));
-    // }
-
-    // function lpForInput(uint256 baseAmount, uint256 speculativeAmount) private view returns (uint256 liquidity) {
-    //     uint256 _totalSupply = Pair(pair).totalSupply();
-    //     IInvariant _invariant = IInvariant(Pair(pair).invariant());
-    //     (uint256 _balanceBase, uint256 _balanceSpec) = pairBalances();
-
-    //     if (_totalSupply == 0) {
-    //         liquidity = _invariant.liquidityForEmpty(baseAmount, baseAmount);
-    //         if (liquidity <= 1000) revert InsufficientOutputError();
-    //         liquidity -= 1000;
-    //     } else {
-    //         liquidity = _invariant.liquidityFor(
-    //             baseAmount,
-    //             speculativeAmount,
-    //             _balanceBase,
-    //             _balanceSpec,
-    //             _totalSupply
-    //         );
-    //     }
-    // }
-
-    // function inputForLp(uint256 liquidity) private view returns (uint256 baseAmount, uint256 speculativeAmount) {
-    //     uint256 _totalSupply = Pair(pair).totalSupply();
-    //     (uint256 _balanceBase, uint256 _balanceSpec) = pairBalances();
-
-    //     baseAmount = (liquidity * _balanceBase) / _totalSupply;
-    //     speculativeAmount = (liquidity * _balanceSpec) / _totalSupply;
-
-    //     if (pairLPAmount() < liquidity) revert CompleteUtilizationError();
-    // }
-
-    // function baseToSpeculative(uint256 baseAmount) private view returns (uint256) {
-    //     return baseReserves() == 0 ? baseAmount : (baseAmount * speculativeReserves()) / baseReserves();
-    // }
-
-    // function speculativeToBase(uint256 speculativeAmount) private view returns (uint256) {
-    //     return
-    //         speculativeReserves() == 0
-    //             ? speculativeAmount
-    //             : (speculativeAmount * baseReserves()) / speculativeReserves();
-    // }
+    /// @dev Assumes reward per token stored is up to date
+    function newTokensOwed(Position.Info memory position) private view returns (uint256) {
+        // TODO: when maker liquidity is partially utilized
+        if (!position.utilized) return 0;
+        uint256 owed = (position.liquidity * (rewardPerTokenStored - position.rewardPerTokenPaid)) / 1 ether;
+        return owed;
+    }
 
     /*//////////////////////////////////////////////////////////////
                             NEW LOGIC
