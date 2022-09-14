@@ -123,7 +123,7 @@ contract Lendgine is ERC20 {
         uint256 amountSpeculative,
         bytes calldata data
     ) external lock returns (uint256) {
-        // _accrueInterest();
+        _accrueInterest();
 
         if (currentPosition == bytes32(0)) revert CompleteUtilizationError();
 
@@ -157,7 +157,7 @@ contract Lendgine is ERC20 {
     }
 
     function burn(address recipient, bytes calldata data) external lock {
-        // _accrueInterest();
+        _accrueInterest();
 
         uint256 amountShares = balanceOf[address(this)];
 
@@ -168,6 +168,7 @@ contract Lendgine is ERC20 {
         uint256 amountSpeculative = speculativeForLP(amountLP);
 
         decreaseCurrentLiquidity(amountLP);
+        totalLPUtilized -= amountLP;
 
         uint256 balanceBefore = balanceLP();
         IMintCallback(msg.sender).MintCallback(false, amountLP, data);
@@ -194,6 +195,16 @@ contract Lendgine is ERC20 {
 
         if (amountLP == 0) revert InsufficientOutputError();
 
+        {
+            bool utilized = (currentPosition == id && currentLiquidity > 0) ||
+                (existing.utilized && currentPosition != id);
+
+            if (utilized) {
+                _accrueInterest();
+                _accrueMakerInterest(id);
+            }
+        }
+
         uint256 utilizedLP;
         if (currentPosition == id) {
             utilizedLP = currentLiquidity;
@@ -203,11 +214,6 @@ contract Lendgine is ERC20 {
         } else if (existing.utilized) {
             utilizedLP = existing.liquidity;
         }
-
-        // if (utilized) {
-        //     _accrueInterest();
-        //     _accrueMakerInterest(id);
-        // }
 
         positions.remove(id);
 
@@ -251,12 +257,12 @@ contract Lendgine is ERC20 {
         Position.Info memory existing = positions.get(msg.sender);
         bytes32 id = Position.getId(recipient);
 
-        // bool utilized = (currentPosition == id && currentLiquidity > 0) || (existing.utilized && currentPosition != id);
+        bool utilized = (currentPosition == id && currentLiquidity > 0) || (existing.utilized && currentPosition != id);
 
-        // if (utilized) {
-        //     _accrueInterest();
-        //     _accrueMakerInterest(id);
-        // }
+        if (utilized) {
+            _accrueInterest();
+            _accrueMakerInterest(id);
+        }
 
         if (amountLP == 0) revert InsufficientOutputError();
 
@@ -462,10 +468,12 @@ contract Lendgine is ERC20 {
         uint256 dilutionLP = (totalLPUtilized * RATE * timeElapsed) / (1 days * 10_000);
         uint256 dilutionSpeculative = speculativeForLP(dilutionLP);
 
+        rewardPerTokenStored += (dilutionSpeculative * 1 ether) / totalLPUtilized;
+
         decreaseCurrentLiquidity(dilutionLP);
+        totalLPUtilized -= dilutionLP;
 
         // Distribute to makers
-        rewardPerTokenStored += (dilutionSpeculative * 1 ether) / totalLPUtilized;
 
         // // TODO: dilution > baseReserves;
         lastUpdate = uint40(block.timestamp);
