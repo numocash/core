@@ -2,7 +2,9 @@
 pragma solidity ^0.8.4;
 
 import { Factory } from "./Factory.sol";
+import { Pair } from "./Pair.sol";
 
+import { ILPCallback } from "./interfaces/ILPCallback.sol";
 import { IMintCallback } from "./interfaces/IMintCallback.sol";
 
 import { Position } from "./libraries/Position.sol";
@@ -60,13 +62,9 @@ contract Lendgine is ERC20 {
                                IMMUTABLES
     //////////////////////////////////////////////////////////////*/
 
-    uint256 public immutable upperBound;
-
     address public immutable factory;
 
-    address public immutable speculativeToken;
-
-    address public immutable lpToken;
+    address public immutable pair;
 
     uint8 public constant RATE = 4; // bips per day
 
@@ -111,7 +109,7 @@ contract Lendgine is ERC20 {
     constructor() ERC20("Numoen Lendgine", "NLDG", 18) {
         factory = msg.sender;
 
-        (speculativeToken, lpToken, upperBound) = Factory(msg.sender).parameters();
+        pair = Factory(msg.sender).pair();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -143,10 +141,10 @@ contract Lendgine is ERC20 {
 
         _mint(recipient, amountShares); // optimistically mint
 
-        SafeTransferLib.safeTransfer(ERC20(lpToken), recipient, lpAmount);
+        SafeTransferLib.safeTransfer(ERC20(pair), recipient, lpAmount);
 
         uint256 balanceBefore = balanceSpeculative();
-        IMintCallback(msg.sender).MintCallback(true, amountSpeculative, data);
+        IMintCallback(msg.sender).MintCallback(amountSpeculative, data);
         uint256 balanceAfter = balanceSpeculative();
 
         if (balanceAfter < balanceBefore + amountSpeculative) revert InsufficientInputError();
@@ -171,14 +169,14 @@ contract Lendgine is ERC20 {
         totalLPUtilized -= amountLP;
 
         uint256 balanceBefore = balanceLP();
-        IMintCallback(msg.sender).MintCallback(false, amountLP, data);
+        ILPCallback(msg.sender).LPCallback(amountLP, data);
         uint256 balanceAfter = balanceLP();
 
         if (balanceAfter < balanceBefore + amountLP) revert InsufficientInputError();
 
         _burn(address(this), amountShares);
 
-        SafeTransferLib.safeTransfer(ERC20(speculativeToken), recipient, amountSpeculative);
+        SafeTransferLib.safeTransfer(ERC20(Pair(pair).token0()), recipient, amountSpeculative);
 
         emit Burn(msg.sender, recipient, amountShares, amountSpeculative);
     }
@@ -241,7 +239,7 @@ contract Lendgine is ERC20 {
 
         // Receive tokens and update global variables
         uint256 balanceBefore = balanceLP();
-        IMintCallback(msg.sender).MintCallback(false, amountLP, data);
+        ILPCallback(msg.sender).LPCallback(amountLP, data);
         uint256 balanceAfter = balanceLP();
 
         if (balanceAfter < balanceBefore + amountLP) revert InsufficientInputError();
@@ -290,7 +288,7 @@ contract Lendgine is ERC20 {
             positions.get(msg.sender).update(-int256(amountLP));
         } else if (amountLP == existing.liquidity) {
             (uint256 tokensOwed, bytes32 previous) = positions.remove(Position.getId(recipient));
-            // if (tokensOwed > 0) SafeTransferLib.safeTransfer(ERC20(base), recipient, tokensOwed);
+            if (tokensOwed > 0) SafeTransferLib.safeTransfer(ERC20(Pair(pair).token0()), recipient, tokensOwed);
 
             if (lastPosition == id) {
                 lastPosition = previous;
@@ -305,7 +303,7 @@ contract Lendgine is ERC20 {
             increaseCurrentLiquidity(utilizedLP);
         }
 
-        SafeTransferLib.safeTransfer(ERC20(lpToken), recipient, amountLP);
+        SafeTransferLib.safeTransfer(ERC20(pair), recipient, amountLP);
 
         emit BurnMaker(msg.sender, recipient, amountLP);
     }
@@ -328,7 +326,7 @@ contract Lendgine is ERC20 {
 
         position.tokensOwed = 0;
 
-        SafeTransferLib.safeTransfer(ERC20(speculativeToken), recipient, collectedTokens);
+        SafeTransferLib.safeTransfer(ERC20(Pair(pair).token0()), recipient, collectedTokens);
 
         emit Collect(msg.sender, recipient, collectedTokens);
     }
@@ -341,7 +339,7 @@ contract Lendgine is ERC20 {
         bool success;
         bytes memory data;
 
-        (success, data) = speculativeToken.staticcall(
+        (success, data) = Pair(pair).token0().staticcall(
             abi.encodeWithSelector(bytes4(keccak256(bytes("balanceOf(address)"))), address(this))
         );
         if (!success || data.length < 32) revert BalanceReturnError();
@@ -353,7 +351,7 @@ contract Lendgine is ERC20 {
         bool success;
         bytes memory data;
 
-        (success, data) = lpToken.staticcall(
+        (success, data) = pair.staticcall(
             abi.encodeWithSelector(bytes4(keccak256(bytes("balanceOf(address)"))), address(this))
         );
         if (!success || data.length < 32) revert BalanceReturnError();
@@ -362,11 +360,11 @@ contract Lendgine is ERC20 {
     }
 
     function speculativeForLP(uint256 _lpAmount) public view returns (uint256) {
-        return (2 * _lpAmount * upperBound) / 1 ether;
+        return (2 * _lpAmount * Pair(pair).upperBound()) / 1 ether;
     }
 
     function lpForSpeculative(uint256 _speculativeAmount) public view returns (uint256) {
-        return (_speculativeAmount * 1 ether) / (2 * upperBound);
+        return (_speculativeAmount * 1 ether) / (2 * Pair(pair).upperBound());
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -380,7 +378,7 @@ contract Lendgine is ERC20 {
 
         // amount of speculative in this tick available
         uint256 remainingCurrentLiquidity = currentPositionInfo.liquidity - currentLiquidity;
-        uint256 remainingLP = amountLP; // amount of lp to be added
+        uint256 remainingLP = amountLP; // amount of pair to be added
 
         while (true) {
             if (remainingCurrentLiquidity >= remainingLP) {
@@ -432,7 +430,7 @@ contract Lendgine is ERC20 {
 
                 // if (currentPositionInfo.previous == bytes32(0)) revert OutOfBoundsError();
 
-                // convert lp tokens to speculative
+                // convert pair tokens to speculative
                 // positions[currentId].liquidity =
                 //     positions[currentId].liquidity -
                 //     remainingCurrentLiquidity +
@@ -450,7 +448,7 @@ contract Lendgine is ERC20 {
         }
         if (remainingCurrentLiquidity == remainingLP) positions[currentId].utilized = false;
 
-        // convert lp tokens to speculative
+        // convert pair tokens to speculative
         // positions[currentId].liquidity =
         //     positions[currentId].liquidity -
         //     remainingShares +
