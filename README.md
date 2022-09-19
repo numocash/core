@@ -1,3 +1,3 @@
 # Lendgine
 
-Numoen Lendgine Engine perpetuals.
+Numoen Perpetual Lending Engine.
