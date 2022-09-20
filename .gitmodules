@@ -5,6 +5,3 @@
 [submodule "lib/solmate"]
 	path = lib/solmate
 	url = https://github.com/transmissions11/solmate
-[submodule "lib/kyleswap2.5"]
-	path = lib/kyleswap2.5
-	url = https://github.com/kyscott18/kyleswap2.5
