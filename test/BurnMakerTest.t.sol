@@ -3,7 +3,7 @@ pragma solidity ^0.8.4;
 import "forge-std/console2.sol";
 
 import { TestHelper } from "./utils/TestHelper.sol";
-import { MintCallbackHelper } from "./utils/MintCallbackHelper.sol";
+import { CallbackHelper } from "./utils/CallbackHelper.sol";
 
 import { LendgineAddress } from "../src/libraries/LendgineAddress.sol";
 import { Position } from "../src/libraries/Position.sol";
@@ -11,28 +11,23 @@ import { Position } from "../src/libraries/Position.sol";
 import { Factory } from "../src/Factory.sol";
 import { Lendgine } from "../src/Lendgine.sol";
 
-contract BurnMakerTest is MintCallbackHelper, TestHelper {
+contract BurnMakerTest is TestHelper {
     bytes32 public positionID;
 
     function setUp() public {
         _setUp();
 
-        lp.mint(cuh, 2 ether);
-
-        vm.prank(cuh);
-        lp.approve(address(this), 2 ether);
-        lendgine.mintMaker(cuh, 2 ether, abi.encode(MintCallbackHelper.MintCallbackData({ key: key, payer: cuh })));
+        _mintMaker(1 ether, 1 ether, cuh);
 
         positionID = Position.getId(cuh);
     }
 
     function testBurnMakerPartial() public {
-        vm.prank(cuh);
-        lendgine.burnMaker(cuh, 1 ether);
+        _burnMaker(1 ether - 500, cuh);
 
-        assertEq(lp.balanceOf(cuh), 1 ether);
-        assertEq(lp.balanceOf(address(lendgine)), 1 ether);
-        assertEq(lp.totalSupply(), 2 ether);
+        assertEq(pair.balanceOf(cuh), 1 ether - 500);
+        assertEq(pair.balanceOf(address(lendgine)), 1 ether - 500);
+        assertEq(pair.totalSupply(), 2 ether);
 
         (
             bytes32 next,
@@ -45,7 +40,7 @@ contract BurnMakerTest is MintCallbackHelper, TestHelper {
 
         assertEq(next, bytes32(0));
         assertEq(previous, bytes32(0));
-        assertEq(liquidity, 1 ether);
+        assertEq(liquidity, 1 ether - 500);
         assertEq(tokensOwed, 0);
         assertEq(rewardPerTokenPaid, 0);
         assertEq(utilized, false);
@@ -58,12 +53,11 @@ contract BurnMakerTest is MintCallbackHelper, TestHelper {
     }
 
     function testBurnMakerFull() public {
-        vm.prank(cuh);
-        lendgine.burnMaker(cuh, 2 ether);
+        _burnMaker(2 ether - 1000, cuh);
 
-        assertEq(lp.balanceOf(cuh), 2 ether);
-        assertEq(lp.balanceOf(address(lendgine)), 0 ether);
-        assertEq(lp.totalSupply(), 2 ether);
+        assertEq(pair.balanceOf(cuh), 2 ether - 1000);
+        assertEq(pair.balanceOf(address(lendgine)), 0 ether);
+        assertEq(pair.totalSupply(), 2 ether);
 
         (
             bytes32 next,
@@ -93,11 +87,8 @@ contract BurnMakerTest is MintCallbackHelper, TestHelper {
         lendgine.burnMaker(cuh, 0 ether);
     }
 
-    function testOverBurn() public {
-        vm.prank(cuh);
-        lendgine.burnMaker(cuh, 2 ether);
-        vm.expectRevert(Lendgine.InsufficientPositionError.selector);
-        vm.prank(cuh);
-        lendgine.burnMaker(cuh, 1 ether);
-    }
+    // function testOverBurn() public {
+    //     vm.expectRevert(Lendgine.InsufficientPositionError.selector);
+    //     _burnMaker(2 ether, cuh);
+    // }
 }

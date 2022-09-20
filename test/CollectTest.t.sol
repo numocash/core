@@ -3,7 +3,7 @@ pragma solidity ^0.8.4;
 import "forge-std/console2.sol";
 
 import { TestHelper } from "./utils/TestHelper.sol";
-import { MintCallbackHelper } from "./utils/MintCallbackHelper.sol";
+import { CallbackHelper } from "./utils/CallbackHelper.sol";
 
 import { LendgineAddress } from "../src/libraries/LendgineAddress.sol";
 import { Position } from "../src/libraries/Position.sol";
@@ -11,16 +11,14 @@ import { Position } from "../src/libraries/Position.sol";
 import { Factory } from "../src/Factory.sol";
 import { Lendgine } from "../src/Lendgine.sol";
 
-contract CollectTest is TestHelper, MintCallbackHelper {
+contract CollectTest is TestHelper {
     bytes32 public positionID;
 
     function setUp() public {
         _setUp();
 
-        lp.mint(cuh, 2 ether);
-        vm.prank(cuh);
-        lp.approve(address(this), 2 ether);
-        lendgine.mintMaker(cuh, 2 ether, abi.encode(MintCallbackHelper.MintCallbackData({ key: key, payer: cuh })));
+        _mintMaker(1 ether, 1 ether, cuh);
+        _mint(1 ether, cuh);
 
         positionID = Position.getId(cuh);
     }
@@ -31,12 +29,6 @@ contract CollectTest is TestHelper, MintCallbackHelper {
     }
 
     function testCollect() public {
-        speculative.mint(cuh, 1 ether);
-
-        vm.prank(cuh);
-        speculative.approve(address(this), 1 ether);
-        lendgine.mint(cuh, 1 ether, abi.encode(MintCallbackHelper.MintCallbackData({ key: key, payer: cuh })));
-
         vm.warp(1 days + 1);
 
         lendgine.accrueInterest();
@@ -52,7 +44,7 @@ contract CollectTest is TestHelper, MintCallbackHelper {
         assertEq(lendgine.balanceOf(cuh), 0.1 ether);
         assertEq(lendgine.balanceOf(address(lendgine)), 0 ether);
 
-        assertEq(speculative.totalSupply(), 1 ether);
+        assertEq(speculative.totalSupply(), 2 ether);
         assertEq(speculative.balanceOf(cuh), dilution * 10);
         assertEq(speculative.balanceOf(address(lendgine)), 1 ether - dilution * 10);
 
@@ -67,7 +59,7 @@ contract CollectTest is TestHelper, MintCallbackHelper {
 
         assertEq(next, bytes32(0));
         assertEq(previous, bytes32(0));
-        assertEq(liquidity, 2 ether);
+        assertEq(liquidity, 2 ether - 1000);
         assertEq(tokensOwed, 0);
         assertEq(rewardPerTokenPaid, dilution * 100);
         assertEq(utilized, true);

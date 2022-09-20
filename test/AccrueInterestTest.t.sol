@@ -3,7 +3,7 @@ pragma solidity ^0.8.4;
 import "forge-std/console2.sol";
 
 import { TestHelper } from "./utils/TestHelper.sol";
-import { MintCallbackHelper } from "./utils/MintCallbackHelper.sol";
+import { CallbackHelper } from "./utils/CallbackHelper.sol";
 
 import { LendgineAddress } from "../src/libraries/LendgineAddress.sol";
 import { Position } from "../src/libraries/Position.sol";
@@ -11,17 +11,13 @@ import { Position } from "../src/libraries/Position.sol";
 import { Factory } from "../src/Factory.sol";
 import { Lendgine } from "../src/Lendgine.sol";
 
-contract AccrueInterestTest is TestHelper, MintCallbackHelper {
+contract AccrueInterestTest is TestHelper {
     bytes32 public positionID;
 
     function setUp() public {
         _setUp();
 
-        lp.mint(cuh, 2 ether);
-
-        vm.prank(cuh);
-        lp.approve(address(this), 2 ether);
-        lendgine.mintMaker(cuh, 2 ether, abi.encode(MintCallbackHelper.MintCallbackData({ key: key, payer: cuh })));
+        _mintMaker(1 ether, 1 ether, cuh);
 
         positionID = Position.getId(cuh);
     }
@@ -40,7 +36,7 @@ contract AccrueInterestTest is TestHelper, MintCallbackHelper {
 
         assertEq(next, bytes32(0));
         assertEq(previous, bytes32(0));
-        assertEq(liquidity, 2 ether);
+        assertEq(liquidity, 2 ether - 1000);
         assertEq(tokensOwed, 0);
         assertEq(rewardPerTokenPaid, 0);
         assertEq(utilized, false);
@@ -51,17 +47,13 @@ contract AccrueInterestTest is TestHelper, MintCallbackHelper {
         assertEq(lendgine.rewardPerTokenStored(), 0);
         assertEq(lendgine.lastUpdate(), 1);
 
-        assertEq(lp.balanceOf(address(lendgine)), 2 ether);
-        assertEq(lp.balanceOf(cuh), 0 ether);
-        assertEq(lp.totalSupply(), 2 ether);
+        assertEq(pair.balanceOf(address(lendgine)), 2 ether - 1000);
+        assertEq(pair.balanceOf(cuh), 0 ether);
+        assertEq(pair.totalSupply(), 2 ether);
     }
 
     function testAccrueInterstNoTime() public {
-        speculative.mint(cuh, 1 ether);
-
-        vm.prank(cuh);
-        speculative.approve(address(this), 1 ether);
-        lendgine.mint(cuh, 1 ether, abi.encode(MintCallbackHelper.MintCallbackData({ key: key, payer: cuh })));
+        _mint(1 ether, cuh);
 
         lendgine.accrueInterest();
 
@@ -86,7 +78,7 @@ contract AccrueInterestTest is TestHelper, MintCallbackHelper {
 
         assertEq(next, bytes32(0));
         assertEq(previous, bytes32(0));
-        assertEq(liquidity, 2 ether);
+        assertEq(liquidity, 2 ether - 1000);
         assertEq(tokensOwed, 0);
         assertEq(rewardPerTokenPaid, 0);
         assertEq(utilized, true);
@@ -100,11 +92,7 @@ contract AccrueInterestTest is TestHelper, MintCallbackHelper {
     }
 
     function testAccrueInterstTime() public {
-        speculative.mint(cuh, 1 ether);
-
-        vm.prank(cuh);
-        speculative.approve(address(this), 1 ether);
-        lendgine.mint(cuh, 1 ether, abi.encode(MintCallbackHelper.MintCallbackData({ key: key, payer: cuh })));
+        _mint(1 ether, cuh);
 
         vm.warp(1 days + 1);
 
@@ -133,7 +121,7 @@ contract AccrueInterestTest is TestHelper, MintCallbackHelper {
 
         assertEq(next, bytes32(0));
         assertEq(previous, bytes32(0));
-        assertEq(liquidity, 2 ether);
+        assertEq(liquidity, 2 ether - 1000);
         assertEq(tokensOwed, dilution * 10);
         assertEq(rewardPerTokenPaid, (dilution * 10 * 1 ether) / (0.1 ether));
         assertEq(utilized, true);

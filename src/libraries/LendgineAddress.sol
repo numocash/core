@@ -7,23 +7,23 @@ import { Lendgine } from "../Lendgine.sol";
 library LendgineAddress {
     /// @notice The identifying key of the pool
     struct LendgineKey {
-        address speculativeToken;
-        address lpToken;
+        address token0;
+        address token1;
         uint256 upperBound;
     }
 
     function getLendgineKey(
-        address speculativeToken,
-        address lpToken,
+        address token0,
+        address token1,
         uint256 upperBound
     ) internal pure returns (LendgineKey memory) {
-        return LendgineKey({ speculativeToken: speculativeToken, lpToken: lpToken, upperBound: upperBound });
+        return LendgineKey({ token0: token0, token1: token1, upperBound: upperBound });
     }
 
     function computeAddress(
         address factory,
         address speculativeToken,
-        address lpToken,
+        address pair,
         uint256 upperBound
     ) internal pure returns (address) {
         address out = address(
@@ -33,7 +33,7 @@ library LendgineAddress {
                         abi.encodePacked(
                             hex"ff",
                             factory,
-                            keccak256(abi.encode(speculativeToken, lpToken, upperBound)),
+                            keccak256(abi.encode(speculativeToken, pair, upperBound)),
                             keccak256(type(Lendgine).creationCode)
                         )
                     )
