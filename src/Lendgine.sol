@@ -168,15 +168,15 @@ contract Lendgine is ERC20 {
         decreaseCurrentLiquidity(amountLP);
         totalLPUtilized -= amountLP;
 
+        _burn(address(this), amountShares);
+
+        SafeTransferLib.safeTransfer(ERC20(Pair(pair).token0()), recipient, amountSpeculative);
+
         uint256 balanceBefore = balanceLP();
         ILPCallback(msg.sender).LPCallback(amountLP, data);
         uint256 balanceAfter = balanceLP();
 
         if (balanceAfter < balanceBefore + amountLP) revert InsufficientInputError();
-
-        _burn(address(this), amountShares);
-
-        SafeTransferLib.safeTransfer(ERC20(Pair(pair).token0()), recipient, amountSpeculative);
 
         emit Burn(msg.sender, recipient, amountShares, amountSpeculative);
     }
