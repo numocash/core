@@ -104,6 +104,8 @@ contract Pair is ERC20 {
         uint256 _totalSupply = totalSupply;
         if (_totalSupply == 0) {
             liquidity = (amount0 + amount1) - MINIMUM_LIQUIDITY;
+
+            // liquidity = (amount0 + (upperBound - amount1 / 2)**2) - MINIMUM_LIQUIDITY;
             _mint(address(0), MINIMUM_LIQUIDITY); // permanently lock the first MINIMUM_LIQUIDITY tokens
         } else {
             liquidity = Math.min((amount0 * _totalSupply) / balance0Before, (amount1 * _totalSupply) / balance1Before);
@@ -150,7 +152,7 @@ contract Pair is ERC20 {
         if (amount0Out == 0 && amount1Out == 0) revert InsufficientOutputError();
 
         (uint256 balance0Before, uint256 balance1Before) = balances();
-        uint256 invariantBefore = balance0Before + balance1Before;
+        uint256 invariantBefore = balance0Before - (upperBound - balance1Before / 2)**2;
 
         if (amount0Out > 0) SafeTransferLib.safeTransfer(ERC20(token0), to, amount0Out);
         if (amount1Out > 0) SafeTransferLib.safeTransfer(ERC20(token1), to, amount1Out);
@@ -162,7 +164,7 @@ contract Pair is ERC20 {
             amount0In = balance0After + amount0Out - balance0Before;
             amount1In = balance1After + amount1Out - balance1Before;
 
-            uint256 invariantAfter = balance0After + balance1After;
+            uint256 invariantAfter = balance0After - (upperBound - balance1After / 2)**2;
 
             if (invariantBefore > invariantAfter) revert InvariantError();
         }
