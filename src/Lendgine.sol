@@ -500,8 +500,12 @@ contract Lendgine is ERC20 {
         emit AccrueMakerInterest();
     }
 
+    /*//////////////////////////////////////////////////////////////
+                                  VIEW
+    //////////////////////////////////////////////////////////////*/
+
     /// @dev Assumes reward per token stored is up to date
-    function newTokensOwed(Position.Info memory position, bytes32 id) private view returns (uint256) {
+    function newTokensOwed(Position.Info memory position, bytes32 id) public view returns (uint256) {
         if (!position.utilized) return 0;
         uint256 liquidity = position.liquidity;
         if (currentPosition == id) {
@@ -509,5 +513,10 @@ contract Lendgine is ERC20 {
         }
         uint256 owed = (liquidity * (rewardPerTokenStored - position.rewardPerTokenPaid)) / 1 ether;
         return owed;
+    }
+
+    function getPositions(address user) external view returns (Position.Info memory info) {
+        bytes32 id = Position.getId(user);
+        return positions[id];
     }
 }
