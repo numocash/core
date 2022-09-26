@@ -10,14 +10,7 @@ out = "out"
 solc = "0.8.16"
 src = "src"
 test = "test"
-script = "script"
 
 [profile.ci]
 fuzz_runs = 1_000
 verbosity = 4
-
-[rpc_endpoints]
-celo = "${CELO_RPC_URL}"
-
-[etherscan]
-celo = { key = "${ETHERSCAN_KEY}" }
