@@ -40,13 +40,9 @@ contract Pair is ERC20 {
 
     error ReentrancyError();
 
-    error InvariantError();
-
     error InsufficientInputError();
 
     error InsufficientOutputError();
-
-    error InsufficientBurnError();
 
     error BalanceReturnError();
 
@@ -132,8 +128,7 @@ contract Pair is ERC20 {
         amount0 = (liquidity * balance0) / _totalSupply;
         amount1 = (liquidity * balance1) / _totalSupply;
 
-        // TODO: can we make this &&
-        if (amount0 == 0 || amount1 == 0) revert InsufficientBurnError();
+        if (amount0 == 0 && amount1 == 0) revert InsufficientOutputError();
 
         _burn(address(this), liquidity); // burn from self for composability
 
@@ -166,7 +161,7 @@ contract Pair is ERC20 {
 
             uint256 invariantAfter = balance0After - (upperBound - balance1After / 2)**2;
 
-            if (invariantBefore > invariantAfter) revert InvariantError();
+            if (invariantBefore > invariantAfter) revert InsufficientInputError();
         }
 
         emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to);
