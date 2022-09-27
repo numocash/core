@@ -87,7 +87,7 @@ contract Lendgine is ERC20 {
 
     uint256 public totalLPUtilized;
 
-    uint256 public rewardPerTokenStored;
+    uint256 public rewardPerINStored;
 
     uint40 public lastUpdate;
 
@@ -134,6 +134,8 @@ contract Lendgine is ERC20 {
         uint256 lpAmount = lpForSpeculative(amountSpeculative);
 
         // amount of shares to award the recipient
+        // TODO: is this being incorrectly used?
+        // TODO: could we use totalSupply of the pair contract?
         uint256 totalLPAmount = totalLPUtilized;
         uint256 _totalSupply = totalSupply;
         uint256 amountShares = totalLPAmount != 0 ? (lpAmount * _totalSupply) / totalLPAmount : lpAmount;
@@ -478,13 +480,13 @@ contract Lendgine is ERC20 {
         }
 
         uint256 timeElapsed = block.timestamp - lastUpdate;
-        if (timeElapsed == 0 || totalLPUtilized == 0) return;
+        if (timeElapsed == 0 || interestNumerator == 0) return;
 
         // calculate how much must be removed
         uint256 dilutionLP = (interestNumerator * timeElapsed) / (1 days * 10_000);
         uint256 dilutionSpeculative = speculativeForLP(dilutionLP);
 
-        rewardPerTokenStored += (dilutionSpeculative * 1 ether) / totalLPUtilized;
+        rewardPerINStored += (dilutionSpeculative * 1 ether) / interestNumerator;
 
         _accrueTickInterest(currentTick);
 
@@ -506,8 +508,10 @@ contract Lendgine is ERC20 {
 
         uint256 tokensOwed = newTokensOwed(_tickInfo, tick);
 
-        tickInfo.rewardPerTokenPaid = rewardPerTokenStored;
-        tickInfo.tokensOwed = _tickInfo.tokensOwed + tokensOwed;
+        tickInfo.rewardPerINPaid = rewardPerINStored;
+        tickInfo.tokensOwedPerLiquidity =
+            _tickInfo.tokensOwedPerLiquidity +
+            ((tokensOwed * 1 ether) / _tickInfo.liquidity);
 
         emit AccrueMakerInterest();
     }
@@ -517,11 +521,12 @@ contract Lendgine is ERC20 {
         Position.Info storage position = positions[id];
         Position.Info memory _position = position;
 
-        if (tick < currentTick) revert UnutilizedAccrueError();
+        Tick.Info storage tickInfo = ticks[tick];
+        Tick.Info memory _tickInfo = tickInfo;
 
-        uint256 tokensOwed = newTokensOwed(_position, tick);
+        uint256 tokensOwed = newTokensOwed(_position, _tickInfo);
 
-        position.rewardPerTokenPaid = rewardPerTokenStored;
+        position.rewardPerLiquidityPaid = tickInfo.tokensOwedPerLiquidity;
         position.tokensOwed = _position.tokensOwed + tokensOwed;
 
         emit AccrueMakerInterest();
@@ -534,18 +539,15 @@ contract Lendgine is ERC20 {
         if (currentTick == tick) {
             liquidity = currentLiquidity;
         }
-        uint256 owed = (liquidity * (rewardPerTokenStored - tickInfo.rewardPerTokenPaid)) / 1 ether;
+        uint256 owed = (liquidity * tick * (rewardPerINStored - tickInfo.rewardPerINPaid)) / 1 ether;
         return owed;
     }
 
     /// @dev Assumes reward per token stored is up to date
-    function newTokensOwed(Position.Info memory position, uint24 tick) private view returns (uint256) {
-        if (tick > currentTick) return 0;
+    function newTokensOwed(Position.Info memory position, Tick.Info memory tickInfo) private pure returns (uint256) {
         uint256 liquidity = position.liquidity;
-        if (currentTick == tick) {
-            liquidity = currentLiquidity;
-        }
-        uint256 owed = (liquidity * (rewardPerTokenStored - position.rewardPerTokenPaid)) / 1 ether;
+
+        uint256 owed = (liquidity * (tickInfo.tokensOwedPerLiquidity - position.rewardPerLiquidityPaid)) / 1 ether;
         return owed;
     }
 }

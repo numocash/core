@@ -20,8 +20,8 @@ library Position {
 
     struct Info {
         uint256 liquidity;
+        uint256 rewardPerLiquidityPaid;
         uint256 tokensOwed;
-        uint256 rewardPerTokenPaid;
     }
 
     /*//////////////////////////////////////////////////////////////

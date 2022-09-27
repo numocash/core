@@ -49,21 +49,21 @@ contract MintMakerTest is TestHelper {
 
         bytes32 positionID = Position.getId(cuh, 1);
 
-        (uint256 liquidity, uint256 tokensOwed, uint256 rewardPerTokenPaid) = lendgine.positions(positionID);
+        (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(positionID);
 
         assertEq(liquidity, 2 ether - 1000);
+        assertEq(rewardPerLiquidityPaid, 0);
         assertEq(tokensOwed, 0);
-        assertEq(rewardPerTokenPaid, 0);
 
-        (liquidity, tokensOwed, rewardPerTokenPaid) = lendgine.ticks(1);
+        (uint256 tickLiquidity, uint256 rewardPerINPaid, uint256 tokensOwedPerLiquidity) = lendgine.ticks(1);
 
-        assertEq(liquidity, 2 ether - 1000);
-        assertEq(tokensOwed, 0);
-        assertEq(rewardPerTokenPaid, 0);
+        assertEq(tickLiquidity, 2 ether - 1000);
+        assertEq(rewardPerINPaid, 0);
+        assertEq(tokensOwedPerLiquidity, 0);
 
         assertEq(lendgine.currentTick(), 1);
         assertEq(lendgine.currentLiquidity(), 0);
-        assertEq(lendgine.rewardPerTokenStored(), 0);
+        assertEq(lendgine.rewardPerINStored(), 0);
         assertEq(lendgine.lastUpdate(), 0);
         assertEq(lendgine.totalLPUtilized(), 0);
         assertEq(lendgine.interestNumerator(), 0);

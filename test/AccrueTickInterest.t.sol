@@ -11,7 +11,7 @@ import { Position } from "../src/libraries/Position.sol";
 import { Factory } from "../src/Factory.sol";
 import { Lendgine } from "../src/Lendgine.sol";
 
-contract AccrueInterestTest is TestHelper {
+contract AccrueTickInterestTest is TestHelper {
     bytes32 public positionID;
 
     function setUp() public {
@@ -23,7 +23,7 @@ contract AccrueInterestTest is TestHelper {
     }
 
     function testAccrueInterestBasic() public {
-        lendgine.accrueInterest();
+        lendgine.accrueTickInterest(1);
 
         (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(positionID);
 
@@ -52,7 +52,7 @@ contract AccrueInterestTest is TestHelper {
     function testAccrueInterstNoTime() public {
         _mint(1 ether, cuh);
 
-        lendgine.accrueInterest();
+        lendgine.accrueTickInterest(1);
 
         // Test lendgine token
         assertEq(lendgine.totalSupply(), 0.1 ether);
@@ -88,7 +88,7 @@ contract AccrueInterestTest is TestHelper {
 
         vm.warp(1 days + 1);
 
-        lendgine.accrueInterest();
+        lendgine.accrueTickInterest(1);
 
         uint256 dilution = (0.1 ether) / 10000;
 

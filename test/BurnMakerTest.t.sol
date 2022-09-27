@@ -29,21 +29,21 @@ contract BurnMakerTest is TestHelper {
         assertEq(pair.balanceOf(address(lendgine)), 1 ether - 500);
         assertEq(pair.totalSupply(), 2 ether);
 
-        (uint256 liquidity, uint256 tokensOwed, uint256 rewardPerTokenPaid) = lendgine.positions(positionID);
+        (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(positionID);
 
         assertEq(liquidity, 1 ether - 500);
+        assertEq(rewardPerLiquidityPaid, 0);
         assertEq(tokensOwed, 0);
-        assertEq(rewardPerTokenPaid, 0);
 
-        (liquidity, tokensOwed, rewardPerTokenPaid) = lendgine.ticks(1);
+        (uint256 tickLiquidity, uint256 rewardPerINPaid, uint256 tokensOwedPerLiquidity) = lendgine.ticks(1);
 
-        assertEq(liquidity, 1 ether - 500);
-        assertEq(tokensOwed, 0);
-        assertEq(rewardPerTokenPaid, 0);
+        assertEq(tickLiquidity, 1 ether - 500);
+        assertEq(rewardPerINPaid, 0);
+        assertEq(tokensOwedPerLiquidity, 0);
 
         assertEq(lendgine.currentTick(), 1);
         assertEq(lendgine.currentLiquidity(), 0);
-        assertEq(lendgine.rewardPerTokenStored(), 0);
+        assertEq(lendgine.rewardPerINStored(), 0);
         assertEq(lendgine.lastUpdate(), 0);
         assertEq(lendgine.totalLPUtilized(), 0);
         assertEq(lendgine.interestNumerator(), 0);
@@ -56,21 +56,21 @@ contract BurnMakerTest is TestHelper {
         assertEq(pair.balanceOf(address(lendgine)), 0 ether);
         assertEq(pair.totalSupply(), 2 ether);
 
-        (uint256 liquidity, uint256 tokensOwed, uint256 rewardPerTokenPaid) = lendgine.positions(positionID);
+        (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(positionID);
 
         assertEq(liquidity, 0 ether);
+        assertEq(rewardPerLiquidityPaid, 0);
         assertEq(tokensOwed, 0);
-        assertEq(rewardPerTokenPaid, 0);
 
-        (liquidity, tokensOwed, rewardPerTokenPaid) = lendgine.ticks(1);
+        (uint256 tickLiquidity, uint256 rewardPerINPaid, uint256 tokensOwedPerLiquidity) = lendgine.ticks(1);
 
-        assertEq(liquidity, 0 ether);
-        assertEq(tokensOwed, 0);
-        assertEq(rewardPerTokenPaid, 0);
+        assertEq(tickLiquidity, 0 ether);
+        assertEq(rewardPerINPaid, 0);
+        assertEq(tokensOwedPerLiquidity, 0);
 
         assertEq(lendgine.currentTick(), 1);
         assertEq(lendgine.currentLiquidity(), 0);
-        assertEq(lendgine.rewardPerTokenStored(), 0);
+        assertEq(lendgine.rewardPerINStored(), 0);
         assertEq(lendgine.lastUpdate(), 0);
         assertEq(lendgine.totalLPUtilized(), 0);
         assertEq(lendgine.interestNumerator(), 0);

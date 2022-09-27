@@ -40,24 +40,22 @@ contract BurnTest is TestHelper {
         assertEq(speculative.balanceOf(cuh), 5 ether);
         assertEq(speculative.balanceOf(address(lendgine)), 5 ether);
 
-        // Test position
-        (uint256 liquidity, uint256 tokensOwed, uint256 rewardPerTokenPaid) = lendgine.positions(positionID);
+        (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(positionID);
 
         assertEq(liquidity, 2 ether - 1000);
+        assertEq(rewardPerLiquidityPaid, 0);
         assertEq(tokensOwed, 0);
-        assertEq(rewardPerTokenPaid, 0);
 
-        // Test tick
-        (liquidity, tokensOwed, rewardPerTokenPaid) = lendgine.ticks(1);
+        (uint256 tickLiquidity, uint256 rewardPerINPaid, uint256 tokensOwedPerLiquidity) = lendgine.ticks(1);
 
-        assertEq(liquidity, 2 ether - 1000);
-        assertEq(tokensOwed, 0);
-        assertEq(rewardPerTokenPaid, 0);
+        assertEq(tickLiquidity, 2 ether - 1000);
+        assertEq(rewardPerINPaid, 0);
+        assertEq(tokensOwedPerLiquidity, 0);
 
         // Test global storage values
         assertEq(lendgine.currentTick(), 1);
         assertEq(lendgine.currentLiquidity(), 0.5 ether);
-        assertEq(lendgine.rewardPerTokenStored(), 0);
+        assertEq(lendgine.rewardPerINStored(), 0);
         assertEq(lendgine.lastUpdate(), 1);
         assertEq(lendgine.totalLPUtilized(), 0.5 ether);
         assertEq(lendgine.interestNumerator(), 0.5 ether);
@@ -79,24 +77,22 @@ contract BurnTest is TestHelper {
         assertEq(speculative.balanceOf(cuh), 10 ether);
         assertEq(speculative.balanceOf(address(lendgine)), 0);
 
-        // Test position
-        (uint256 liquidity, uint256 tokensOwed, uint256 rewardPerTokenPaid) = lendgine.positions(positionID);
+        (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(positionID);
 
         assertEq(liquidity, 2 ether - 1000);
+        assertEq(rewardPerLiquidityPaid, 0);
         assertEq(tokensOwed, 0);
-        assertEq(rewardPerTokenPaid, 0);
 
-        // Test tick
-        (liquidity, tokensOwed, rewardPerTokenPaid) = lendgine.ticks(1);
+        (uint256 tickLiquidity, uint256 rewardPerINPaid, uint256 tokensOwedPerLiquidity) = lendgine.ticks(1);
 
-        assertEq(liquidity, 2 ether - 1000);
-        assertEq(tokensOwed, 0);
-        assertEq(rewardPerTokenPaid, 0);
+        assertEq(tickLiquidity, 2 ether - 1000);
+        assertEq(rewardPerINPaid, 0);
+        assertEq(tokensOwedPerLiquidity, 0);
 
         // Test global storage values
         assertEq(lendgine.currentTick(), 1);
         assertEq(lendgine.currentLiquidity(), 0 ether);
-        assertEq(lendgine.rewardPerTokenStored(), 0);
+        assertEq(lendgine.rewardPerINStored(), 0);
         assertEq(lendgine.lastUpdate(), 1);
         assertEq(lendgine.totalLPUtilized(), 0 ether);
         assertEq(lendgine.interestNumerator(), 0);

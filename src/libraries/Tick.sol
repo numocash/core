@@ -12,8 +12,8 @@ library Tick {
 
     struct Info {
         uint256 liquidity;
-        uint256 tokensOwed;
-        uint256 rewardPerTokenPaid;
+        uint256 rewardPerINPaid;
+        uint256 tokensOwedPerLiquidity;
     }
 
     function update(
