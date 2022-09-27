@@ -70,8 +70,6 @@ contract Lendgine is ERC20 {
 
     address public immutable pair;
 
-    uint8 public constant RATE = 4; // bips per day
-
     /*//////////////////////////////////////////////////////////////
                           LENDGINE STORAGE
     //////////////////////////////////////////////////////////////*/
@@ -85,7 +83,7 @@ contract Lendgine is ERC20 {
 
     uint256 public currentLiquidity;
 
-    // TODO: add interestNumerator
+    uint256 public interestNumerator;
 
     uint256 public totalLPUtilized;
 
@@ -143,7 +141,8 @@ contract Lendgine is ERC20 {
         if (amountShares == 0) revert InsufficientOutputError();
 
         // gather speculative tokens from makers
-        increaseCurrentLiquidity(lpAmount);
+        uint256 interestNumeratorDelta = increaseCurrentLiquidity(lpAmount);
+        interestNumerator += interestNumeratorDelta;
         totalLPUtilized += lpAmount;
 
         _mint(recipient, amountShares); // optimistically mint
@@ -172,7 +171,8 @@ contract Lendgine is ERC20 {
 
         uint256 amountSpeculative = speculativeForLP(amountLP);
 
-        decreaseCurrentLiquidity(amountLP);
+        uint256 interestNumeratorDelta = decreaseCurrentLiquidity(amountLP);
+        interestNumerator -= interestNumeratorDelta;
         totalLPUtilized -= amountLP;
 
         _burn(address(this), amountShares);
@@ -377,13 +377,13 @@ contract Lendgine is ERC20 {
     //////////////////////////////////////////////////////////////*/
 
     /// @dev Current position is assumed to be valid
-    function increaseCurrentLiquidity(uint256 amountLP) private {
+    function increaseCurrentLiquidity(uint256 amountLP) private returns (uint256 interestNumeratorDelta) {
         uint24 _currentTick = currentTick;
         Tick.Info memory currentTickInfo = ticks[_currentTick];
 
         // amount of speculative in this tick available
         uint256 remainingCurrentLiquidity = currentTickInfo.liquidity - currentLiquidity;
-        uint256 remainingLP = amountLP; // amount of pair to be added
+        uint256 remainingLP = amountLP; // amount of pair lp tokens to be added
 
         while (true) {
             if (remainingCurrentLiquidity >= remainingLP) {
@@ -403,6 +403,7 @@ contract Lendgine is ERC20 {
                 // TODO: error when max tick is reached
                 currentTickInfo = ticks[_currentTick];
 
+                interestNumeratorDelta += _currentTick * remainingCurrentLiquidity;
                 remainingLP -= remainingCurrentLiquidity;
                 remainingCurrentLiquidity = currentTickInfo.liquidity;
             }
@@ -416,12 +417,13 @@ contract Lendgine is ERC20 {
         //     (remainingSpeculative * liquidityPerSpeculative) /
         //     1 ether;
 
+        interestNumeratorDelta += _currentTick * remainingLP;
         currentTick = _currentTick;
         currentLiquidity = remainingLP;
     }
 
     /// @dev assumed to never decrease past zero
-    function decreaseCurrentLiquidity(uint256 amountLP) private {
+    function decreaseCurrentLiquidity(uint256 amountLP) private returns (uint256 interestNumeratorDelta) {
         uint24 _currentTick = currentTick;
         Tick.Info memory currentTickInfo = ticks[_currentTick];
 
@@ -443,6 +445,8 @@ contract Lendgine is ERC20 {
                 //     (remainingCurrentLiquidity * speculativePerLiquidity) /
                 //     1 ether;
 
+                interestNumeratorDelta += _currentTick * remainingCurrentLiquidity;
+
                 // should never underflow
                 _currentTick = _currentTick - 1;
                 currentTickInfo = ticks[_currentTick];
@@ -462,6 +466,7 @@ contract Lendgine is ERC20 {
         //     ((remainingShares) * speculativePerLiquidity) /
         //     1 ether;
 
+        interestNumeratorDelta += _currentTick * remainingLP;
         currentTick = _currentTick;
         currentLiquidity = remainingCurrentLiquidity - remainingLP;
     }
@@ -476,7 +481,7 @@ contract Lendgine is ERC20 {
         if (timeElapsed == 0 || totalLPUtilized == 0) return;
 
         // calculate how much must be removed
-        uint256 dilutionLP = (totalLPUtilized * RATE * timeElapsed) / (1 days * 10_000);
+        uint256 dilutionLP = (interestNumerator * timeElapsed) / (1 days * 10_000);
         uint256 dilutionSpeculative = speculativeForLP(dilutionLP);
 
         rewardPerTokenStored += (dilutionSpeculative * 1 ether) / totalLPUtilized;

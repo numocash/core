@@ -45,6 +45,8 @@ contract BurnMakerTest is TestHelper {
         assertEq(lendgine.currentLiquidity(), 0);
         assertEq(lendgine.rewardPerTokenStored(), 0);
         assertEq(lendgine.lastUpdate(), 0);
+        assertEq(lendgine.totalLPUtilized(), 0);
+        assertEq(lendgine.interestNumerator(), 0);
     }
 
     function testBurnMakerFull() public {
@@ -70,6 +72,8 @@ contract BurnMakerTest is TestHelper {
         assertEq(lendgine.currentLiquidity(), 0);
         assertEq(lendgine.rewardPerTokenStored(), 0);
         assertEq(lendgine.lastUpdate(), 0);
+        assertEq(lendgine.totalLPUtilized(), 0);
+        assertEq(lendgine.interestNumerator(), 0);
     }
 
     function testZeroBurn() public {
@@ -79,6 +83,6 @@ contract BurnMakerTest is TestHelper {
 
     // function testOverBurn() public {
     //     vm.expectRevert(Lendgine.InsufficientPositionError.selector);
-    //     _burnMaker(2 ether, cuh);
+    //     _burnMaker(2 ether, 1, cuh);
     // }
 }
