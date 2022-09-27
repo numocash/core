@@ -121,7 +121,5 @@ contract AccrueInterestTest is TestHelper {
         assertEq(lendgine.lastUpdate(), 1 days + 1);
     }
 
-    // calling accrue interest twice
-
     // withdraw and receive correct amount
 }

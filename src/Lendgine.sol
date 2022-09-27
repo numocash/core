@@ -488,10 +488,11 @@ contract Lendgine is ERC20 {
 
         _accrueTickInterest(currentTick);
 
-        decreaseCurrentLiquidity(dilutionLP);
+        uint256 interestNumeratorDelta = decreaseCurrentLiquidity(dilutionLP);
+        interestNumerator -= interestNumeratorDelta;
         totalLPUtilized -= dilutionLP;
 
-        // // TODO: dilution > baseReserves;
+        // TODO: dilution > baseReserves;
         lastUpdate = uint40(block.timestamp);
 
         emit AccrueInterest();
@@ -525,10 +526,6 @@ contract Lendgine is ERC20 {
 
         emit AccrueMakerInterest();
     }
-
-    /*//////////////////////////////////////////////////////////////
-                                  VIEW
-    //////////////////////////////////////////////////////////////*/
 
     /// @dev Assumes reward per token stored is up to date
     function newTokensOwed(Tick.Info memory tickInfo, uint24 tick) private view returns (uint256) {
