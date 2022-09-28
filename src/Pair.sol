@@ -53,7 +53,7 @@ contract Pair {
                                IMMUTABLES
     //////////////////////////////////////////////////////////////*/
 
-    uint256 public constant MINIMUM_LIQUIDITY = 10**3;
+    uint256 public constant MINIMUM_LIQUIDITY = 1 ether;
 
     address public immutable factory;
 
@@ -133,22 +133,23 @@ contract Pair {
         emit Mint(msg.sender, amount0, amount1, liquidity);
     }
 
-    function burn(address to) external lock returns (uint256 amount0, uint256 amount1) {
-        (uint256 balance0, uint256 balance1) = balances();
-
-        uint256 liquidity = buffer;
-        uint256 _totalSupply = totalSupply;
-        amount0 = (liquidity * balance0) / _totalSupply;
-        amount1 = (liquidity * balance1) / _totalSupply;
-
+    function burn(
+        address to,
+        uint256 amount0,
+        uint256 amount1
+    ) external lock returns (uint256 k) {
         if (amount0 == 0 && amount1 == 0) revert InsufficientOutputError();
 
-        _burn(liquidity); // burn from self for composability
+        uint256 invariantOffset = upperBound**2;
+
+        k = invariantOffset + amount0 - (upperBound - amount1 / 2)**2;
+
+        _burn(k);
 
         SafeTransferLib.safeTransfer(ERC20(token0), to, amount0);
         SafeTransferLib.safeTransfer(ERC20(token1), to, amount1);
 
-        emit Burn(msg.sender, amount0, amount1, liquidity, to);
+        emit Burn(msg.sender, amount0, amount1, k, to);
     }
 
     function swap(

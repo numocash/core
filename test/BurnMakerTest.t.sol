@@ -23,21 +23,21 @@ contract BurnMakerTest is TestHelper {
     }
 
     function testBurnMakerPartial() public {
-        _burnMaker(1 ether - 500, 1, cuh);
+        _burnMaker((k - pair.MINIMUM_LIQUIDITY()) / 2, 1, cuh);
 
-        assertEq(pair.buffer(), 1 ether - 500);
+        assertEq(pair.buffer(), (k - pair.MINIMUM_LIQUIDITY()) / 2);
 
-        assertEq(pair.totalSupply(), 2 ether);
+        assertEq(pair.totalSupply(), k);
 
         (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(positionID);
 
-        assertEq(liquidity, 1 ether - 500);
+        assertEq(liquidity, (k - pair.MINIMUM_LIQUIDITY()) / 2);
         assertEq(rewardPerLiquidityPaid, 0);
         assertEq(tokensOwed, 0);
 
         (uint256 tickLiquidity, uint256 rewardPerINPaid, uint256 tokensOwedPerLiquidity) = lendgine.ticks(1);
 
-        assertEq(tickLiquidity, 1 ether - 500);
+        assertEq(tickLiquidity, (k - pair.MINIMUM_LIQUIDITY()) / 2);
         assertEq(rewardPerINPaid, 0);
         assertEq(tokensOwedPerLiquidity, 0);
 
@@ -49,10 +49,10 @@ contract BurnMakerTest is TestHelper {
     }
 
     function testBurnMakerFull() public {
-        _burnMaker(2 ether - 1000, 1, cuh);
+        _burnMaker(k - pair.MINIMUM_LIQUIDITY(), 1, cuh);
 
-        assertEq(pair.buffer(), 2 ether - 1000);
-        assertEq(pair.totalSupply(), 2 ether);
+        assertEq(pair.buffer(), k - pair.MINIMUM_LIQUIDITY());
+        assertEq(pair.totalSupply(), k);
 
         (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(positionID);
 
