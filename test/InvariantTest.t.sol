@@ -81,22 +81,27 @@ contract InvariantTest is TestHelper {
         // CallbackValidation.verifyCallback(factory, decoded.poolKey);
 
         if (decoded.amount0In > 0) pay(ERC20(decoded.key.token0), decoded.payer, msg.sender, decoded.amount0In);
-        if (decoded.amount1In > 0) pay(ERC20(decoded.key.token0), decoded.payer, msg.sender, decoded.amount1In);
+        if (decoded.amount1In > 0) pay(ERC20(decoded.key.token1), decoded.payer, msg.sender, decoded.amount1In);
     }
 
     function testSwap() public {
-        _pairMint(200 ether, 20 ether, cuh);
+        _pairMint(0 ether, 2 ether, cuh);
 
-        uint256 amount1Out = 0.001 ether;
+        uint256 amount1Out = 0.00001 ether;
 
-        uint256 amount0In = amount1Out * upperBound + (amount1Out**2) / 4 - 10 ether;
+        uint256 amount0In = (amount1Out * upperBound) + ((amount1Out**2) / 4) - 10 ether;
 
-        console2.log(amount0In);
+        speculative.mint(cuh, amount0In / 1 ether);
 
-        //     // vm.prank(cuh);
-        //     // speculative.approve(address(this), amount0In);
+        vm.prank(cuh);
+        speculative.approve(address(this), amount0In / (1 ether));
 
-        //     // pair.swap
+        pair.swap(
+            0,
+            amount1Out,
+            cuh,
+            abi.encode(SwapCallbackData({ key: key, payer: cuh, amount0In: amount0In / 1 ether, amount1In: 0 }))
+        );
     }
 
     // test 2/3 1/3 burn

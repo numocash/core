@@ -100,7 +100,9 @@ contract Pair {
     //////////////////////////////////////////////////////////////*/
 
     function calcInvariant(uint256 r0, uint256 r1) public view returns (uint256 invariant) {
-        invariant = r0 + upperBound * r1 - (r1**2) / 4;
+        console2.log("a", r0 + (upperBound * r1) / 1 ether);
+        console2.log("b", (r1**2) / 4 ether);
+        invariant = r0 + (upperBound * r1) / 1 ether - (r1**2) / 4 ether;
     }
 
     function mint(
@@ -163,7 +165,9 @@ contract Pair {
             amount1In = balance1After + amount1Out - balance1Before;
 
             uint256 invariantAfter = calcInvariant(balance0After, balance1After);
-
+            console2.log("IB", invariantBefore);
+            console2.log("IA", invariantAfter);
+            // console2.log("dif", invariantBefore - invariantAfter);
             if (invariantBefore > invariantAfter) revert InsufficientInputError();
         }
 
