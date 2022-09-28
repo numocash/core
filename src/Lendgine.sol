@@ -166,7 +166,6 @@ contract Lendgine is ERC20 {
 
         uint256 amountShares = balanceOf[address(this)];
 
-        // TODO: should we be using the lendgine balance because it decrease when people remove their lp
         uint256 amountLP = (amountShares * totalLiquidityBorrowed) / totalSupply;
 
         if (amountLP == 0) revert InsufficientOutputError();
@@ -202,7 +201,7 @@ contract Lendgine is ERC20 {
 
             if (utilized) {
                 _accrueInterest();
-                _accrueTickInterest(tick);
+                if (tick != currentTick) _accrueTickInterest(tick);
                 _accrueMakerInterest(id, tick);
             }
         }
@@ -234,7 +233,7 @@ contract Lendgine is ERC20 {
 
         if (utilized) {
             _accrueInterest();
-            _accrueTickInterest(tick);
+            if (tick != currentTick) _accrueTickInterest(tick);
             _accrueMakerInterest(id, tick);
         }
 
@@ -285,15 +284,17 @@ contract Lendgine is ERC20 {
         _accrueInterest();
     }
 
-    // TODO: revise these functions
     function accrueTickInterest(uint24 tick) external lock {
         if (tick == 0) revert InvalidTick();
         _accrueInterest();
-        _accrueTickInterest(tick);
+        if (tick != currentTick) _accrueTickInterest(tick);
     }
 
     function accrueMakerInterest(bytes32 id, uint24 tick) external lock {
+        if (tick == 0) revert InvalidTick();
+
         _accrueInterest();
+        if (tick != currentTick) _accrueTickInterest(tick);
         _accrueMakerInterest(id, tick);
     }
 
