@@ -100,8 +100,8 @@ contract Pair {
     //////////////////////////////////////////////////////////////*/
 
     function calcInvariant(uint256 r0, uint256 r1) public view returns (uint256 invariant) {
-        console2.log("a", r0 + (upperBound * r1) / 1 ether);
-        console2.log("b", (r1**2) / 4 ether);
+        // console2.log("a", r0 + (upperBound * r1) / 1 ether);
+        // console2.log("b", (r1**2) / 4 ether);
         invariant = r0 + (upperBound * r1) / 1 ether - (r1**2) / 4 ether;
     }
 

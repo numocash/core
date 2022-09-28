@@ -89,18 +89,24 @@ contract InvariantTest is TestHelper {
 
         uint256 amount1Out = 0.00001 ether;
 
-        uint256 amount0In = (amount1Out * upperBound) + ((amount1Out**2) / 4) - 10 ether;
+        uint256 a = (amount1Out * upperBound) / 1 ether;
 
-        speculative.mint(cuh, amount0In / 1 ether);
+        uint256 b = ((amount1Out**2) / 4) / 1 ether;
+
+        uint256 c = (2 ether * amount1Out) / 2 ether;
+
+        uint256 amount0In = a + b - c;
+
+        speculative.mint(cuh, amount0In);
 
         vm.prank(cuh);
-        speculative.approve(address(this), amount0In / (1 ether));
+        speculative.approve(address(this), amount0In);
 
         pair.swap(
             0,
             amount1Out,
             cuh,
-            abi.encode(SwapCallbackData({ key: key, payer: cuh, amount0In: amount0In / 1 ether, amount1In: 0 }))
+            abi.encode(SwapCallbackData({ key: key, payer: cuh, amount0In: amount0In, amount1In: 0 }))
         );
     }
 
