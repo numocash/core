@@ -52,6 +52,8 @@ contract Lendgine is ERC20 {
 
     error BalanceReturnError();
 
+    error InvalidTick();
+
     error InsufficientInputError();
 
     error InsufficientOutputError();
@@ -85,8 +87,6 @@ contract Lendgine is ERC20 {
 
     uint256 public interestNumerator;
 
-    uint256 public totalLPUtilized;
-
     uint256 public rewardPerINStored;
 
     uint40 public lastUpdate;
@@ -114,7 +114,7 @@ contract Lendgine is ERC20 {
     constructor() ERC20("Numoen Lendgine", "NLDG", 18) {
         factory = msg.sender;
 
-        pair = Factory(msg.sender).pair();
+        pair = address(new Pair{ salt: keccak256(abi.encode(address(this))) }());
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -136,7 +136,7 @@ contract Lendgine is ERC20 {
         // amount of shares to award the recipient
         // TODO: is this being incorrectly used?
         // TODO: could we use totalSupply of the pair contract?
-        uint256 totalLPAmount = totalLPUtilized;
+        uint256 totalLPAmount = Pair(pair).totalSupply();
         uint256 _totalSupply = totalSupply;
         uint256 amountShares = totalLPAmount != 0 ? (lpAmount * _totalSupply) / totalLPAmount : lpAmount;
 
@@ -145,11 +145,10 @@ contract Lendgine is ERC20 {
         // gather speculative tokens from makers
         uint256 interestNumeratorDelta = increaseCurrentLiquidity(lpAmount);
         interestNumerator += interestNumeratorDelta;
-        totalLPUtilized += lpAmount;
 
         _mint(recipient, amountShares); // optimistically mint
 
-        SafeTransferLib.safeTransfer(ERC20(pair), recipient, lpAmount);
+        Pair(pair).addBuffer(lpAmount);
 
         uint256 balanceBefore = balanceSpeculative();
         IMintCallback(msg.sender).MintCallback(amountSpeculative, data);
@@ -162,12 +161,12 @@ contract Lendgine is ERC20 {
         return amountShares;
     }
 
-    function burn(address recipient, bytes calldata data) external lock {
+    function burn(address recipient) external lock {
         _accrueInterest();
 
         uint256 amountShares = balanceOf[address(this)];
 
-        uint256 amountLP = (amountShares * totalLPUtilized) / totalSupply;
+        uint256 amountLP = (amountShares * Pair(pair).totalSupply()) / totalSupply;
 
         if (amountLP == 0) revert InsufficientOutputError();
 
@@ -175,36 +174,24 @@ contract Lendgine is ERC20 {
 
         uint256 interestNumeratorDelta = decreaseCurrentLiquidity(amountLP);
         interestNumerator -= interestNumeratorDelta;
-        totalLPUtilized -= amountLP;
 
         _burn(address(this), amountShares);
 
         SafeTransferLib.safeTransfer(ERC20(Pair(pair).token0()), recipient, amountSpeculative);
 
-        uint256 balanceBefore = balanceLP();
-        ILPCallback(msg.sender).LPCallback(amountLP, data);
-        uint256 balanceAfter = balanceLP();
-
-        if (balanceAfter < balanceBefore + amountLP) revert InsufficientInputError();
+        Pair(pair).removeBuffer(amountLP);
 
         emit Burn(msg.sender, recipient, amountShares, amountSpeculative);
     }
 
-    // TODO: there is no access restriction so anyone can mint for someone else,
-    // bumping them to the end of the positions queue
-    function mintMaker(
-        address recipient,
-        uint24 tick,
-        uint256 amountLP,
-        bytes calldata data
-    ) external lock {
+    function mintMaker(address recipient, uint24 tick) external lock {
+        uint256 amountLP = Pair(pair).buffer();
+
         Position.Info storage position = positions.get(recipient, tick);
         bytes32 id = Position.getId(recipient, tick);
 
         if (amountLP == 0) revert InsufficientOutputError();
-        if (tick == 0) revert();
-
-        // TODO: tick = 0 is an error
+        if (tick == 0) revert InvalidTick();
 
         // trigger accruals if current position is utilized
         {
@@ -217,42 +204,25 @@ contract Lendgine is ERC20 {
             }
         }
 
-        // determine the amount of utilized lp that this position has
-        // uint256 utilizedLP;
-        // if (currentPosition == id) {
-        //     utilizedLP = currentLiquidity;
-
-        //     currentLiquidity = 0;
-        //     currentPosition = positions[currentPosition].next;
-        // } else if (existing.utilized) {
-        //     utilizedLP = existing.liquidity;
-        // }
-
         ticks.update(tick, int256(amountLP));
         position.update(int256(amountLP));
 
         // remove liquidity if we bumped someone out
-
-        // Replace if we removed utilized liquidity
         if (tick < currentTick) {
             decreaseCurrentLiquidity(amountLP);
         }
 
-        // TODO: handle empty edge case
         if (currentTick == 0) {
             currentTick = tick;
         }
 
-        // Receive tokens and update global variables
-        uint256 balanceBefore = balanceLP();
-        ILPCallback(msg.sender).LPCallback(amountLP, data);
-        if (balanceLP() < balanceBefore + amountLP) revert InsufficientInputError();
+        Pair(pair).removeBuffer(amountLP);
 
         emit MintMaker(msg.sender, recipient, amountLP);
     }
 
     function burnMaker(uint24 tick, uint256 amountLP) external lock {
-        if (tick == 0) revert();
+        if (tick == 0) revert InvalidTick();
 
         Position.Info storage position = positions.get(msg.sender, tick);
         bytes32 id = Position.getId(msg.sender, tick);
@@ -278,7 +248,6 @@ contract Lendgine is ERC20 {
                 // if fully removing position
                 // TODO: write to stack instead
                 currentLiquidity = 0;
-                // currentPosition = positions[currentPosition].next;
             }
         } else if (tick < currentTick) {
             utilizedLP = amountLP;
@@ -304,7 +273,7 @@ contract Lendgine is ERC20 {
             increaseCurrentLiquidity(utilizedLP);
         }
 
-        SafeTransferLib.safeTransfer(ERC20(pair), msg.sender, amountLP);
+        Pair(pair).addBuffer(amountLP);
 
         emit BurnMaker(msg.sender, amountLP);
     }
@@ -315,6 +284,7 @@ contract Lendgine is ERC20 {
 
     // TODO: revise these functions
     function accrueTickInterest(uint24 tick) external lock {
+        if (tick == 0) revert InvalidTick();
         _accrueInterest();
         _accrueTickInterest(tick);
     }
@@ -325,6 +295,8 @@ contract Lendgine is ERC20 {
     }
 
     function collectMaker(address recipient, uint24 tick) external lock returns (uint256 collectedTokens) {
+        if (tick == 0) revert InvalidTick();
+
         Position.Info storage position = positions.get(msg.sender, tick);
 
         collectedTokens = position.tokensOwed;
@@ -347,18 +319,6 @@ contract Lendgine is ERC20 {
         bytes memory data;
 
         (success, data) = Pair(pair).token0().staticcall(
-            abi.encodeWithSelector(bytes4(keccak256(bytes("balanceOf(address)"))), address(this))
-        );
-        if (!success || data.length < 32) revert BalanceReturnError();
-
-        return abi.decode(data, (uint256));
-    }
-
-    function balanceLP() public view returns (uint256) {
-        bool success;
-        bytes memory data;
-
-        (success, data) = pair.staticcall(
             abi.encodeWithSelector(bytes4(keccak256(bytes("balanceOf(address)"))), address(this))
         );
         if (!success || data.length < 32) revert BalanceReturnError();
@@ -393,13 +353,6 @@ contract Lendgine is ERC20 {
             } else {
                 // if (!currentPositionInfo.utilized) positions[currentId].utilized = true;
 
-                // alter the amount of liquidity the user has
-                // positions[currentId].liquidity =
-                //     positions[currentId].liquidity -
-                //     remainingCurrentLiquidity +
-                //     (remainingCurrentLiquidity * liquidityPerSpeculative) /
-                //     1 ether;
-
                 _currentTick = _currentTick + 1;
                 // if (currentId == bytes32(0)) revert CompleteUtilizationError();
                 // TODO: error when max tick is reached
@@ -411,13 +364,6 @@ contract Lendgine is ERC20 {
             }
         }
         // if (!currentPositionInfo.utilized && remainingLP != 0) positions[currentId].utilized = true;
-
-        // // alter the amount of liquidity the user has
-        // positions[currentId].liquidity =
-        //     positions[currentId].liquidity -
-        //     remainingSpeculative +
-        //     (remainingSpeculative * liquidityPerSpeculative) /
-        //     1 ether;
 
         interestNumeratorDelta += _currentTick * remainingLP;
         currentTick = _currentTick;
@@ -440,13 +386,6 @@ contract Lendgine is ERC20 {
 
                 // if (currentPositionInfo.previous == bytes32(0)) revert OutOfBoundsError();
 
-                // convert pair tokens to speculative
-                // positions[currentId].liquidity =
-                //     positions[currentId].liquidity -
-                //     remainingCurrentLiquidity +
-                //     (remainingCurrentLiquidity * speculativePerLiquidity) /
-                //     1 ether;
-
                 interestNumeratorDelta += _currentTick * remainingCurrentLiquidity;
 
                 // should never underflow
@@ -460,13 +399,6 @@ contract Lendgine is ERC20 {
             }
         }
         // if (remainingCurrentLiquidity == remainingLP) positions[currentId].utilized = false;
-
-        // convert pair tokens to speculative
-        // positions[currentId].liquidity =
-        //     positions[currentId].liquidity -
-        //     remainingShares +
-        //     ((remainingShares) * speculativePerLiquidity) /
-        //     1 ether;
 
         interestNumeratorDelta += _currentTick * remainingLP;
         currentTick = _currentTick;
@@ -492,7 +424,6 @@ contract Lendgine is ERC20 {
 
         uint256 interestNumeratorDelta = decreaseCurrentLiquidity(dilutionLP);
         interestNumerator -= interestNumeratorDelta;
-        totalLPUtilized -= dilutionLP;
 
         // TODO: dilution > baseReserves;
         lastUpdate = uint40(block.timestamp);

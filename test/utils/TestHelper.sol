@@ -48,9 +48,11 @@ abstract contract TestHelper is Test, CallbackHelper {
     function _setUp() internal {
         factory = new Factory();
 
-        (address _lendgine, address _pair) = factory.createLendgine(address(speculative), address(base), upperBound);
+        address _lendgine = factory.createLendgine(address(speculative), address(base), upperBound);
 
         lendgine = Lendgine(_lendgine);
+
+        address _pair = lendgine.pair();
 
         pair = Pair(_pair);
     }
@@ -75,14 +77,8 @@ abstract contract TestHelper is Test, CallbackHelper {
         uint256 liquidity = pair.mint(
             amountSpeculative,
             amountBase,
-            spender,
             abi.encode(CallbackHelper.CallbackData({ key: key, payer: spender }))
         );
-
-        if (spender != address(this)) {
-            vm.prank(spender);
-            pair.approve(address(this), liquidity);
-        }
 
         lendgine.mintMaker(
             spender,
@@ -113,11 +109,6 @@ abstract contract TestHelper is Test, CallbackHelper {
     }
 
     function _burn(uint256 amount, address spender) internal {
-        if (spender != address(this)) {
-            vm.prank(spender);
-            pair.approve(address(this), amount * 10);
-        }
-
         vm.prank(spender);
         lendgine.transfer(address(lendgine), amount);
 
