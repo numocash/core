@@ -93,9 +93,9 @@ contract Pair {
                                CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
-    constructor() {
+    constructor(address _factory) {
         lendgine = msg.sender;
-        factory = Lendgine(lendgine).factory();
+        factory = _factory;
         (token0, token1, upperBound) = Factory(factory).parameters();
     }
 
@@ -200,6 +200,15 @@ contract Pair {
         if (!success || data.length < 32) revert BalanceReturnError();
 
         return (balance0, abi.decode(data, (uint256)));
+    }
+
+    function lendgineBalance() public view returns (uint256) {
+        uint256 _totalSupply = totalSupply;
+        if (_totalSupply == 0) return 0;
+
+        uint256 _buffer = buffer;
+
+        return _totalSupply - _buffer - MINIMUM_LIQUIDITY;
     }
 
     /*//////////////////////////////////////////////////////////////

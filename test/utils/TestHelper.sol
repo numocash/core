@@ -74,18 +74,9 @@ abstract contract TestHelper is Test, CallbackHelper {
             base.approve(address(this), amountBase);
         }
 
-        uint256 liquidity = pair.mint(
-            amountSpeculative,
-            amountBase,
-            abi.encode(CallbackHelper.CallbackData({ key: key, payer: spender }))
-        );
+        pair.mint(amountSpeculative, amountBase, abi.encode(CallbackHelper.CallbackData({ key: key, payer: spender })));
 
-        lendgine.mintMaker(
-            spender,
-            tick,
-            liquidity,
-            abi.encode(CallbackHelper.CallbackData({ key: key, payer: spender }))
-        );
+        lendgine.mintMaker(spender, tick);
     }
 
     function _burnMaker(
@@ -112,6 +103,6 @@ abstract contract TestHelper is Test, CallbackHelper {
         vm.prank(spender);
         lendgine.transfer(address(lendgine), amount);
 
-        lendgine.burn(spender, abi.encode(CallbackHelper.CallbackData({ key: key, payer: spender })));
+        lendgine.burn(spender);
     }
 }

@@ -41,11 +41,9 @@ contract AccrueTickInterestTest is TestHelper {
         assertEq(lendgine.currentLiquidity(), 0);
         assertEq(lendgine.rewardPerINStored(), 0);
         assertEq(lendgine.lastUpdate(), 1);
-        assertEq(lendgine.totalLPUtilized(), 0);
         assertEq(lendgine.interestNumerator(), 0);
 
-        assertEq(pair.balanceOf(address(lendgine)), 2 ether - 1000);
-        assertEq(pair.balanceOf(cuh), 0 ether);
+        assertEq(pair.buffer(), 0 ether);
         assertEq(pair.totalSupply(), 2 ether);
     }
 
@@ -79,7 +77,6 @@ contract AccrueTickInterestTest is TestHelper {
         assertEq(lendgine.currentLiquidity(), 0.1 ether);
         assertEq(lendgine.rewardPerINStored(), 0);
         assertEq(lendgine.lastUpdate(), 1);
-        assertEq(lendgine.totalLPUtilized(), 0.1 ether);
         assertEq(lendgine.interestNumerator(), 0.1 ether);
     }
 

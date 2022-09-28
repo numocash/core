@@ -4,7 +4,6 @@ pragma solidity ^0.8.4;
 import { Factory } from "./Factory.sol";
 import { Pair } from "./Pair.sol";
 
-import { ILPCallback } from "./interfaces/ILPCallback.sol";
 import { IMintCallback } from "./interfaces/IMintCallback.sol";
 
 import { Position } from "./libraries/Position.sol";
@@ -87,6 +86,8 @@ contract Lendgine is ERC20 {
 
     uint256 public interestNumerator;
 
+    uint256 public totalLiquidityBorrowed;
+
     uint256 public rewardPerINStored;
 
     uint40 public lastUpdate;
@@ -114,7 +115,7 @@ contract Lendgine is ERC20 {
     constructor() ERC20("Numoen Lendgine", "NLDG", 18) {
         factory = msg.sender;
 
-        pair = address(new Pair{ salt: keccak256(abi.encode(address(this))) }());
+        pair = address(new Pair{ salt: keccak256(abi.encode(address(this))) }(msg.sender));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -134,17 +135,16 @@ contract Lendgine is ERC20 {
         uint256 lpAmount = lpForSpeculative(amountSpeculative);
 
         // amount of shares to award the recipient
-        // TODO: is this being incorrectly used?
-        // TODO: could we use totalSupply of the pair contract?
-        uint256 totalLPAmount = Pair(pair).totalSupply();
+        uint256 totalLPAmount = totalLiquidityBorrowed;
         uint256 _totalSupply = totalSupply;
-        uint256 amountShares = totalLPAmount != 0 ? (lpAmount * _totalSupply) / totalLPAmount : lpAmount;
+        uint256 amountShares = _totalSupply != 0 ? (lpAmount * _totalSupply) / totalLPAmount : lpAmount;
 
         if (amountShares == 0) revert InsufficientOutputError();
 
         // gather speculative tokens from makers
         uint256 interestNumeratorDelta = increaseCurrentLiquidity(lpAmount);
         interestNumerator += interestNumeratorDelta;
+        totalLiquidityBorrowed += lpAmount;
 
         _mint(recipient, amountShares); // optimistically mint
 
@@ -166,14 +166,17 @@ contract Lendgine is ERC20 {
 
         uint256 amountShares = balanceOf[address(this)];
 
-        uint256 amountLP = (amountShares * Pair(pair).totalSupply()) / totalSupply;
+        // TODO: should we be using the lendgine balance because it decrease when people remove their lp
+        uint256 amountLP = (amountShares * totalLiquidityBorrowed) / totalSupply;
 
         if (amountLP == 0) revert InsufficientOutputError();
 
         uint256 amountSpeculative = speculativeForLP(amountLP);
 
         uint256 interestNumeratorDelta = decreaseCurrentLiquidity(amountLP);
+
         interestNumerator -= interestNumeratorDelta;
+        totalLiquidityBorrowed -= amountLP;
 
         _burn(address(this), amountShares);
 
@@ -394,7 +397,6 @@ contract Lendgine is ERC20 {
 
                 remainingLP -= remainingCurrentLiquidity;
                 remainingCurrentLiquidity = currentTickInfo.liquidity;
-
                 _accrueTickInterest(_currentTick);
             }
         }

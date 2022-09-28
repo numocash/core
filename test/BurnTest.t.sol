@@ -33,8 +33,7 @@ contract BurnTest is TestHelper {
         assertEq(lendgine.balanceOf(address(lendgine)), 0 ether);
 
         // // Test base token
-        assertEq(pair.balanceOf(cuh), 0.5 ether);
-        assertEq(pair.balanceOf(address(lendgine)), 1.5 ether - 1000);
+        assertEq(pair.buffer(), 0.5 ether);
 
         // Test speculative token
         assertEq(speculative.balanceOf(cuh), 5 ether);
@@ -57,7 +56,6 @@ contract BurnTest is TestHelper {
         assertEq(lendgine.currentLiquidity(), 0.5 ether);
         assertEq(lendgine.rewardPerINStored(), 0);
         assertEq(lendgine.lastUpdate(), 1);
-        assertEq(lendgine.totalLPUtilized(), 0.5 ether);
         assertEq(lendgine.interestNumerator(), 0.5 ether);
     }
 
@@ -70,8 +68,7 @@ contract BurnTest is TestHelper {
         assertEq(lendgine.balanceOf(address(lendgine)), 0 ether);
 
         // Test pair token
-        assertEq(pair.balanceOf(cuh), 0);
-        assertEq(pair.balanceOf(address(lendgine)), 2 ether - 1000);
+        assertEq(pair.buffer(), 0 ether);
 
         // Test speculative token
         assertEq(speculative.balanceOf(cuh), 10 ether);
@@ -94,12 +91,11 @@ contract BurnTest is TestHelper {
         assertEq(lendgine.currentLiquidity(), 0 ether);
         assertEq(lendgine.rewardPerINStored(), 0);
         assertEq(lendgine.lastUpdate(), 1);
-        assertEq(lendgine.totalLPUtilized(), 0 ether);
         assertEq(lendgine.interestNumerator(), 0);
     }
 
     function testZeroBurn() public {
         vm.expectRevert(Lendgine.InsufficientOutputError.selector);
-        lendgine.burn(cuh, abi.encode(CallbackHelper.CallbackData({ key: key, payer: cuh })));
+        lendgine.burn(cuh);
     }
 }

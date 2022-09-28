@@ -2,7 +2,6 @@ pragma solidity ^0.8.4;
 
 import { IMintCallback } from "../../src/interfaces/IMintCallback.sol";
 import { IPairMintCallback } from "../../src/interfaces/IPairMintCallback.sol";
-import { ILPCallback } from "../../src/interfaces/ILPCallback.sol";
 
 import { Lendgine } from "../../src/Lendgine.sol";
 
@@ -12,18 +11,10 @@ import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
 import { ERC20 } from "solmate/tokens/ERC20.sol";
 import "forge-std/console2.sol";
 
-abstract contract CallbackHelper is IMintCallback, IPairMintCallback, ILPCallback {
+abstract contract CallbackHelper is IMintCallback, IPairMintCallback {
     struct CallbackData {
         LendgineAddress.LendgineKey key;
         address payer;
-    }
-
-    function LPCallback(uint256 amountLP, bytes calldata data) external override {
-        CallbackData memory decoded = abi.decode(data, (CallbackData));
-
-        address pair = Lendgine(msg.sender).pair();
-
-        if (amountLP > 0) pay(ERC20(pair), decoded.payer, msg.sender, amountLP);
     }
 
     function PairMintCallback(

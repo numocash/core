@@ -31,7 +31,8 @@ contract MintTest is TestHelper {
         assertEq(lendgine.balanceOf(address(lendgine)), 0 ether);
 
         // Test pair token
-        assertEq(pair.balanceOf(cuh), 1 ether);
+        assertEq(pair.buffer(), 1 ether);
+        assertEq(pair.totalSupply(), 2 ether);
 
         (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(positionID);
 
@@ -50,7 +51,6 @@ contract MintTest is TestHelper {
         assertEq(lendgine.currentLiquidity(), 1 ether);
         assertEq(lendgine.rewardPerINStored(), 0);
         assertEq(lendgine.lastUpdate(), 1);
-        assertEq(lendgine.totalLPUtilized(), 1 ether);
         assertEq(lendgine.interestNumerator(), 1 ether);
     }
 
@@ -108,7 +108,8 @@ contract MintTest is TestHelper {
         assertEq(speculative.balanceOf(cuh), 0);
         assertEq(speculative.balanceOf(address(lendgine)), 20 ether - 10_000);
 
-        assertEq(pair.balanceOf(address(cuh)), 2 ether - 1000);
+        assertEq(pair.buffer(), 2 ether - 1000);
+        assertEq(pair.totalSupply(), 2 ether);
 
         (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(positionID);
 
@@ -127,7 +128,6 @@ contract MintTest is TestHelper {
         assertEq(lendgine.currentLiquidity(), 2 ether - 1000);
         assertEq(lendgine.rewardPerINStored(), 0);
         assertEq(lendgine.lastUpdate(), 1);
-        assertEq(lendgine.totalLPUtilized(), 2 ether - 1000);
         assertEq(lendgine.interestNumerator(), 2 ether - 1000);
     }
 }

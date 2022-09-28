@@ -25,8 +25,8 @@ contract BurnMakerTest is TestHelper {
     function testBurnMakerPartial() public {
         _burnMaker(1 ether - 500, 1, cuh);
 
-        assertEq(pair.balanceOf(cuh), 1 ether - 500);
-        assertEq(pair.balanceOf(address(lendgine)), 1 ether - 500);
+        assertEq(pair.buffer(), 1 ether - 500);
+
         assertEq(pair.totalSupply(), 2 ether);
 
         (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(positionID);
@@ -45,15 +45,13 @@ contract BurnMakerTest is TestHelper {
         assertEq(lendgine.currentLiquidity(), 0);
         assertEq(lendgine.rewardPerINStored(), 0);
         assertEq(lendgine.lastUpdate(), 0);
-        assertEq(lendgine.totalLPUtilized(), 0);
         assertEq(lendgine.interestNumerator(), 0);
     }
 
     function testBurnMakerFull() public {
         _burnMaker(2 ether - 1000, 1, cuh);
 
-        assertEq(pair.balanceOf(cuh), 2 ether - 1000);
-        assertEq(pair.balanceOf(address(lendgine)), 0 ether);
+        assertEq(pair.buffer(), 2 ether - 1000);
         assertEq(pair.totalSupply(), 2 ether);
 
         (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(positionID);
@@ -72,7 +70,6 @@ contract BurnMakerTest is TestHelper {
         assertEq(lendgine.currentLiquidity(), 0);
         assertEq(lendgine.rewardPerINStored(), 0);
         assertEq(lendgine.lastUpdate(), 0);
-        assertEq(lendgine.totalLPUtilized(), 0);
         assertEq(lendgine.interestNumerator(), 0);
     }
 
