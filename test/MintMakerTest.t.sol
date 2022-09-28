@@ -51,13 +51,13 @@ contract MintMakerTest is TestHelper {
 
         (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(positionID);
 
-        assertEq(liquidity, 2 ether - 1000);
+        assertEq(liquidity, k - pair.MINIMUM_LIQUIDITY());
         assertEq(rewardPerLiquidityPaid, 0);
         assertEq(tokensOwed, 0);
 
         (uint256 tickLiquidity, uint256 rewardPerINPaid, uint256 tokensOwedPerLiquidity) = lendgine.ticks(1);
 
-        assertEq(tickLiquidity, 2 ether - 1000);
+        assertEq(tickLiquidity, k - pair.MINIMUM_LIQUIDITY());
         assertEq(rewardPerINPaid, 0);
         assertEq(tokensOwedPerLiquidity, 0);
 
@@ -68,7 +68,7 @@ contract MintMakerTest is TestHelper {
         assertEq(lendgine.interestNumerator(), 0);
 
         assertEq(pair.buffer(), 0 ether);
-        assertEq(pair.totalSupply(), 2 ether);
+        assertEq(pair.totalSupply(), k);
     }
 
     function testZeroMint() public {

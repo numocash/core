@@ -110,15 +110,15 @@ contract Pair {
     ) external lock returns (uint256 liquidity) {
         (uint256 balance0Before, uint256 balance1Before) = balances();
 
-        uint256 _totalSupply = totalSupply;
-        if (_totalSupply == 0) {
-            liquidity = (amount0 + amount1) - MINIMUM_LIQUIDITY;
+        uint256 invariantOffset = upperBound**2;
 
-            // liquidity = (amount0 + (upperBound - amount1 / 2)**2) - MINIMUM_LIQUIDITY;
+        uint256 _totalSupply = totalSupply;
+        liquidity = invariantOffset + amount0 - (upperBound - amount1 / 2)**2;
+        if (_totalSupply == 0) {
+            liquidity -= MINIMUM_LIQUIDITY;
             totalSupply += MINIMUM_LIQUIDITY; // permanently lock the first MINIMUM_LIQUIDITY tokens
-        } else {
-            liquidity = Math.min((amount0 * _totalSupply) / balance0Before, (amount1 * _totalSupply) / balance1Before);
         }
+        // TODO: should we use the proportional amounts like uniV2
 
         if (liquidity == 0) revert InsufficientOutputError();
         _mint(liquidity); // optimistic mint
@@ -159,8 +159,10 @@ contract Pair {
     ) external lock returns (uint256 amount0In, uint256 amount1In) {
         if (amount0Out == 0 && amount1Out == 0) revert InsufficientOutputError();
 
+        uint256 invariantOffset = upperBound**2;
+
         (uint256 balance0Before, uint256 balance1Before) = balances();
-        uint256 invariantBefore = balance0Before - (upperBound - balance1Before / 2)**2;
+        uint256 invariantBefore = invariantOffset + balance0Before - (upperBound - balance1Before / 2)**2;
 
         if (amount0Out > 0) SafeTransferLib.safeTransfer(ERC20(token0), to, amount0Out);
         if (amount1Out > 0) SafeTransferLib.safeTransfer(ERC20(token1), to, amount1Out);
@@ -172,7 +174,7 @@ contract Pair {
             amount0In = balance0After + amount0Out - balance0Before;
             amount1In = balance1After + amount1Out - balance1Before;
 
-            uint256 invariantAfter = balance0After - (upperBound - balance1After / 2)**2;
+            uint256 invariantAfter = invariantOffset + balance0After - (upperBound - balance1After / 2)**2;
 
             if (invariantBefore > invariantAfter) revert InsufficientInputError();
         }
@@ -203,10 +205,10 @@ contract Pair {
     }
 
     function lendgineBalance() public view returns (uint256) {
-        uint256 _totalSupply = totalSupply;
+        uint256 _totalSupply = totalSupply; // SLOAD for gas optimization
         if (_totalSupply == 0) return 0;
 
-        uint256 _buffer = buffer;
+        uint256 _buffer = buffer; // SLOAD for gas optimization
 
         return _totalSupply - _buffer - MINIMUM_LIQUIDITY;
     }

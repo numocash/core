@@ -18,6 +18,8 @@ abstract contract TestHelper is Test, CallbackHelper {
 
     uint256 public immutable upperBound = 5 ether;
 
+    uint256 public immutable k = 5 ether**2 + 1 ether - (5 ether - 1 ether / 2)**2;
+
     address public immutable cuh;
     address public immutable dennis;
 
@@ -77,6 +79,25 @@ abstract contract TestHelper is Test, CallbackHelper {
         pair.mint(amountSpeculative, amountBase, abi.encode(CallbackHelper.CallbackData({ key: key, payer: spender })));
 
         lendgine.mintMaker(spender, tick);
+    }
+
+    function _pairMint(
+        uint256 amountSpeculative,
+        uint256 amountBase,
+        address spender
+    ) internal {
+        speculative.mint(spender, amountSpeculative);
+        base.mint(spender, amountBase);
+
+        if (spender != address(this)) {
+            vm.prank(spender);
+            speculative.approve(address(this), amountSpeculative);
+
+            vm.prank(spender);
+            base.approve(address(this), amountBase);
+        }
+
+        pair.mint(amountSpeculative, amountBase, abi.encode(CallbackHelper.CallbackData({ key: key, payer: spender })));
     }
 
     function _burnMaker(
