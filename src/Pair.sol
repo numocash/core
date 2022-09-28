@@ -7,8 +7,6 @@ import { Lendgine } from "./Lendgine.sol";
 import { IPairMintCallback } from "./interfaces/IPairMintCallback.sol";
 import { ISwapCallback } from "./interfaces/ISwapCallback.sol";
 
-import { Math } from "./libraries/Math.sol";
-
 import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
 import { ERC20 } from "solmate/tokens/ERC20.sol";
 
@@ -101,16 +99,17 @@ contract Pair {
                               PAIR LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    function calcInvariant(uint256 r0, uint256 r1) public view returns (uint256 invariant) {
+        invariant = r0 + upperBound * r1 - (r1**2) / 4;
+    }
+
     function mint(
         uint256 amount0,
         uint256 amount1,
         bytes calldata data
     ) external lock returns (uint256 liquidity) {
         (uint256 balance0Before, uint256 balance1Before) = balances();
-
-        uint256 invariantOffset = upperBound**2;
-
-        liquidity = invariantOffset + amount0 - (upperBound - amount1 / 2)**2;
+        liquidity = calcInvariant(amount0, amount1);
 
         if (liquidity == 0) revert InsufficientOutputError();
         _mint(liquidity); // optimistic mint
@@ -132,9 +131,7 @@ contract Pair {
     ) external lock returns (uint256 k) {
         if (amount0 == 0 && amount1 == 0) revert InsufficientOutputError();
 
-        uint256 invariantOffset = upperBound**2;
-
-        k = invariantOffset + amount0 - (upperBound - amount1 / 2)**2;
+        k = calcInvariant(amount0, amount1);
 
         _burn(k);
 
@@ -152,10 +149,8 @@ contract Pair {
     ) external lock returns (uint256 amount0In, uint256 amount1In) {
         if (amount0Out == 0 && amount1Out == 0) revert InsufficientOutputError();
 
-        uint256 invariantOffset = upperBound**2;
-
         (uint256 balance0Before, uint256 balance1Before) = balances();
-        uint256 invariantBefore = invariantOffset + balance0Before - (upperBound - balance1Before / 2)**2;
+        uint256 invariantBefore = calcInvariant(balance0Before, balance1Before);
 
         if (amount0Out > 0) SafeTransferLib.safeTransfer(ERC20(token0), to, amount0Out);
         if (amount1Out > 0) SafeTransferLib.safeTransfer(ERC20(token1), to, amount1Out);
@@ -167,7 +162,7 @@ contract Pair {
             amount0In = balance0After + amount0Out - balance0Before;
             amount1In = balance1After + amount1Out - balance1Before;
 
-            uint256 invariantAfter = invariantOffset + balance0After - (upperBound - balance1After / 2)**2;
+            uint256 invariantAfter = calcInvariant(balance0After, balance1After);
 
             if (invariantBefore > invariantAfter) revert InsufficientInputError();
         }

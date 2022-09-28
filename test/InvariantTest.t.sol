@@ -4,6 +4,7 @@ import "forge-std/console2.sol";
 
 import { TestHelper } from "./utils/TestHelper.sol";
 import { CallbackHelper } from "./utils/CallbackHelper.sol";
+import { ERC20 } from "solmate/tokens/ERC20.sol";
 
 import { LendgineAddress } from "../src/libraries/LendgineAddress.sol";
 
@@ -62,6 +63,40 @@ contract InvariantTest is TestHelper {
 
         assertEq(pair.totalSupply(), 0);
         assertEq(pair.buffer(), 0);
+    }
+
+    struct SwapCallbackData {
+        LendgineAddress.LendgineKey key;
+        address payer;
+        uint256 amount0In;
+        uint256 amount1In;
+    }
+
+    function SwapCallback(
+        uint256,
+        uint256,
+        bytes calldata data
+    ) external {
+        SwapCallbackData memory decoded = abi.decode(data, (SwapCallbackData));
+        // CallbackValidation.verifyCallback(factory, decoded.poolKey);
+
+        if (decoded.amount0In > 0) pay(ERC20(decoded.key.token0), decoded.payer, msg.sender, decoded.amount0In);
+        if (decoded.amount1In > 0) pay(ERC20(decoded.key.token0), decoded.payer, msg.sender, decoded.amount1In);
+    }
+
+    function testSwap() public {
+        _pairMint(200 ether, 20 ether, cuh);
+
+        uint256 amount1Out = 0.001 ether;
+
+        uint256 amount0In = amount1Out * upperBound + (amount1Out**2) / 4 - 10 ether;
+
+        console2.log(amount0In);
+
+        //     // vm.prank(cuh);
+        //     // speculative.approve(address(this), amount0In);
+
+        //     // pair.swap
     }
 
     // test 2/3 1/3 burn
