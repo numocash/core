@@ -53,8 +53,6 @@ contract Pair {
                                IMMUTABLES
     //////////////////////////////////////////////////////////////*/
 
-    uint256 public constant MINIMUM_LIQUIDITY = 1 ether;
-
     address public immutable factory;
 
     address public immutable lendgine;
@@ -112,13 +110,7 @@ contract Pair {
 
         uint256 invariantOffset = upperBound**2;
 
-        uint256 _totalSupply = totalSupply;
         liquidity = invariantOffset + amount0 - (upperBound - amount1 / 2)**2;
-        if (_totalSupply == 0) {
-            liquidity -= MINIMUM_LIQUIDITY;
-            totalSupply += MINIMUM_LIQUIDITY; // permanently lock the first MINIMUM_LIQUIDITY tokens
-        }
-        // TODO: should we use the proportional amounts like uniV2
 
         if (liquidity == 0) revert InsufficientOutputError();
         _mint(liquidity); // optimistic mint
@@ -211,7 +203,7 @@ contract Pair {
 
         uint256 _buffer = buffer; // SLOAD for gas optimization
 
-        return _totalSupply - _buffer - MINIMUM_LIQUIDITY;
+        return _totalSupply - _buffer;
     }
 
     /*//////////////////////////////////////////////////////////////

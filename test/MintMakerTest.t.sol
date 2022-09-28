@@ -51,13 +51,13 @@ contract MintMakerTest is TestHelper {
 
         (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(positionID);
 
-        assertEq(liquidity, k - pair.MINIMUM_LIQUIDITY());
+        assertEq(liquidity, k);
         assertEq(rewardPerLiquidityPaid, 0);
         assertEq(tokensOwed, 0);
 
         (uint256 tickLiquidity, uint256 rewardPerINPaid, uint256 tokensOwedPerLiquidity) = lendgine.ticks(1);
 
-        assertEq(tickLiquidity, k - pair.MINIMUM_LIQUIDITY());
+        assertEq(tickLiquidity, k);
         assertEq(rewardPerINPaid, 0);
         assertEq(tokensOwedPerLiquidity, 0);
 

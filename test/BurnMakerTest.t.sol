@@ -23,21 +23,21 @@ contract BurnMakerTest is TestHelper {
     }
 
     function testBurnMakerPartial() public {
-        _burnMaker((k - pair.MINIMUM_LIQUIDITY()) / 2, 1, cuh);
+        _burnMaker(k / 2, 1, cuh);
 
-        assertEq(pair.buffer(), (k - pair.MINIMUM_LIQUIDITY()) / 2);
+        assertEq(pair.buffer(), k / 2);
 
         assertEq(pair.totalSupply(), k);
 
         (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(positionID);
 
-        assertEq(liquidity, (k - pair.MINIMUM_LIQUIDITY()) / 2);
+        assertEq(liquidity, k / 2);
         assertEq(rewardPerLiquidityPaid, 0);
         assertEq(tokensOwed, 0);
 
         (uint256 tickLiquidity, uint256 rewardPerINPaid, uint256 tokensOwedPerLiquidity) = lendgine.ticks(1);
 
-        assertEq(tickLiquidity, (k - pair.MINIMUM_LIQUIDITY()) / 2);
+        assertEq(tickLiquidity, k / 2);
         assertEq(rewardPerINPaid, 0);
         assertEq(tokensOwedPerLiquidity, 0);
 
@@ -49,9 +49,9 @@ contract BurnMakerTest is TestHelper {
     }
 
     function testBurnMakerFull() public {
-        _burnMaker(k - pair.MINIMUM_LIQUIDITY(), 1, cuh);
+        _burnMaker(k, 1, cuh);
 
-        assertEq(pair.buffer(), k - pair.MINIMUM_LIQUIDITY());
+        assertEq(pair.buffer(), k);
         assertEq(pair.totalSupply(), k);
 
         (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(positionID);
