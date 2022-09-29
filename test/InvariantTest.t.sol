@@ -41,7 +41,8 @@ contract InvariantTest is TestHelper {
         _mintMaker(1 ether, 1 ether, 1, cuh);
         _pairMint(1_000_000, 1_000_000, dennis);
 
-        uint256 k2 = 5 ether**2 + 1_000_000 - (5 ether - 1_000_000 / 2)**2;
+        // TODO: precision lost with small amounts of inputs
+        uint256 k2 = 1_000_000 + (5 * 1_000_000);
 
         assertEq(pair.totalSupply(), k + k2);
         assertEq(pair.buffer(), k2);
@@ -103,9 +104,9 @@ contract InvariantTest is TestHelper {
         speculative.approve(address(this), amount0In);
 
         pair.swap(
+            cuh,
             0,
             amount1Out,
-            cuh,
             abi.encode(SwapCallbackData({ key: key, payer: cuh, amount0In: amount0In, amount1In: 0 }))
         );
     }

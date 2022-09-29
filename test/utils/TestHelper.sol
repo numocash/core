@@ -18,7 +18,7 @@ abstract contract TestHelper is Test, CallbackHelper {
 
     uint256 public immutable upperBound = 5 ether;
 
-    uint256 public immutable k = 5 ether**2 + 1 ether - (5 ether - 1 ether / 2)**2;
+    uint256 public immutable k = 1 ether + 5 ether - (1 ether**2) / 4 ether;
 
     address public immutable cuh;
     address public immutable dennis;

@@ -144,9 +144,9 @@ contract Pair {
     }
 
     function swap(
+        address to,
         uint256 amount0Out,
         uint256 amount1Out,
-        address to,
         bytes calldata data
     ) external lock returns (uint256 amount0In, uint256 amount1In) {
         if (amount0Out == 0 && amount1Out == 0) revert InsufficientOutputError();
@@ -165,8 +165,8 @@ contract Pair {
             amount1In = balance1After + amount1Out - balance1Before;
 
             uint256 invariantAfter = calcInvariant(balance0After, balance1After);
-            console2.log("IB", invariantBefore);
-            console2.log("IA", invariantAfter);
+            // console2.log("IB", invariantBefore);
+            // console2.log("IA", invariantAfter);
             // console2.log("dif", invariantBefore - invariantAfter);
             if (invariantBefore > invariantAfter) revert InsufficientInputError();
         }
