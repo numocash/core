@@ -102,7 +102,7 @@ contract Pair {
     function calcInvariant(uint256 r0, uint256 r1) public view returns (uint256 invariant) {
         // console2.log("a", r0 + (upperBound * r1) / 1 ether);
         // console2.log("b", (r1**2) / 4 ether);
-        invariant = r0 + (upperBound * r1) / 1 ether - (r1**2) / 4 ether;
+        invariant = 10**9 * r0 + (upperBound * r1) / (10**9) - (r1**2) / (4 * 10**9);
     }
 
     function mint(
@@ -196,13 +196,11 @@ contract Pair {
         return (balance0, abi.decode(data, (uint256)));
     }
 
-    function lendgineBalance() public view returns (uint256) {
+    function lendgineBalance() external view returns (uint256) {
         uint256 _totalSupply = totalSupply; // SLOAD for gas optimization
         if (_totalSupply == 0) return 0;
 
-        uint256 _buffer = buffer; // SLOAD for gas optimization
-
-        return _totalSupply - _buffer;
+        return _totalSupply - buffer;
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -42,7 +42,7 @@ contract InvariantTest is TestHelper {
         _pairMint(1_000_000, 1_000_000, dennis);
 
         // TODO: precision lost with small amounts of inputs
-        uint256 k2 = 1_000_000 + (5 * 1_000_000);
+        uint256 k2 = 10**15 + 5 * 10**15 - 10**3 / 4;
 
         assertEq(pair.totalSupply(), k + k2);
         assertEq(pair.buffer(), k2);
