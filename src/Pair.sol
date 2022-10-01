@@ -10,8 +10,6 @@ import { ISwapCallback } from "./interfaces/ISwapCallback.sol";
 import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
 import { ERC20 } from "solmate/tokens/ERC20.sol";
 
-import "forge-std/console2.sol";
-
 /// @notice A gas efficient and opinionated capped power invariant pair
 /// @author Kyle Scott (https://github.com/numoen/core/blob/master/src/Pair.sol)
 /// @author Modified from Uniswap (https://github.com/Uniswap/v2-core/blob/master/contracts/UniswapV2Pair.sol)
