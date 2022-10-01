@@ -13,7 +13,7 @@ import { ERC20 } from "solmate/tokens/ERC20.sol";
 import "forge-std/console2.sol";
 
 /// @notice A gas efficient and opinionated capped power invariant pair
-/// @author Kyle Scott (https://github.com/numoen/core/blob/main/src/Pair.sol)
+/// @author Kyle Scott (https://github.com/numoen/core/blob/master/src/Pair.sol)
 /// @author Modified from Uniswap (https://github.com/Uniswap/v2-core/blob/master/contracts/UniswapV2Pair.sol)
 /// Primitive (https://github.com/primitivefinance/rmm-core/blob/main/contracts/PrimitiveEngine.sol),
 /// and Solmate (https://github.com/transmissions11/solmate/blob/main/src/tokens/ERC20.sol)
