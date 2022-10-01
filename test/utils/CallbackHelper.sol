@@ -24,15 +24,15 @@ abstract contract CallbackHelper is IMintCallback, IPairMintCallback {
     ) external override {
         CallbackData memory decoded = abi.decode(data, (CallbackData));
 
-        if (amount0 > 0) pay(ERC20(decoded.key.token0), decoded.payer, msg.sender, amount0);
-        if (amount1 > 0) pay(ERC20(decoded.key.token1), decoded.payer, msg.sender, amount1);
+        if (amount0 > 0) pay(ERC20(decoded.key.base), decoded.payer, msg.sender, amount0);
+        if (amount1 > 0) pay(ERC20(decoded.key.speculative), decoded.payer, msg.sender, amount1);
     }
 
     function MintCallback(uint256 amount, bytes calldata data) external override {
         CallbackData memory decoded = abi.decode(data, (CallbackData));
         // CallbackValidation.verifyCallback(factory, decoded.poolKey);
 
-        if (amount > 0) pay(ERC20(decoded.key.token0), decoded.payer, msg.sender, amount);
+        if (amount > 0) pay(ERC20(decoded.key.base), decoded.payer, msg.sender, amount);
     }
 
     /// @param token The token to pay

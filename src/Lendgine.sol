@@ -179,7 +179,7 @@ contract Lendgine is ERC20 {
 
         _burn(address(this), amountShares);
 
-        SafeTransferLib.safeTransfer(ERC20(Pair(pair).token0()), recipient, amountSpeculative);
+        SafeTransferLib.safeTransfer(ERC20(Pair(pair).speculative()), recipient, amountSpeculative);
 
         Pair(pair).removeBuffer(amountLP);
 
@@ -309,7 +309,7 @@ contract Lendgine is ERC20 {
 
         position.tokensOwed = 0;
 
-        SafeTransferLib.safeTransfer(ERC20(Pair(pair).token0()), recipient, collectedTokens);
+        SafeTransferLib.safeTransfer(ERC20(Pair(pair).speculative()), recipient, collectedTokens);
 
         emit Collect(msg.sender, recipient, collectedTokens);
     }
@@ -322,7 +322,7 @@ contract Lendgine is ERC20 {
         bool success;
         bytes memory data;
 
-        (success, data) = Pair(pair).token0().staticcall(
+        (success, data) = Pair(pair).speculative().staticcall(
             abi.encodeWithSelector(bytes4(keccak256(bytes("balanceOf(address)"))), address(this))
         );
         if (!success || data.length < 32) revert BalanceReturnError();

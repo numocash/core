@@ -19,8 +19,8 @@ contract MintMakerTest is TestHelper {
     function testAddress() public {
         address estimate = LendgineAddress.computeAddress(
             address(factory),
-            address(speculative),
             address(base),
+            address(speculative),
             upperBound
         );
 
@@ -31,8 +31,8 @@ contract MintMakerTest is TestHelper {
         assertEq(lendgine.factory(), address(factory));
         assertEq(lendgine.pair(), address(pair));
 
-        assertEq(pair.token0(), address(speculative));
-        assertEq(pair.token1(), address(base));
+        assertEq(pair.speculative(), address(speculative));
+        assertEq(pair.base(), address(base));
         assertEq(pair.upperBound(), upperBound);
     }
 

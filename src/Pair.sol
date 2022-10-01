@@ -12,10 +12,11 @@ import { ERC20 } from "solmate/tokens/ERC20.sol";
 
 import "forge-std/console2.sol";
 
-/// @notice A general purpose and gas efficient CFMM pair
-/// @author Kyle Scott (https://github.com/kyscott18/kyleswap2.5/blob/main/src/Pair.sol)
+/// @notice A gas efficient and opinionated capped power invariant pair
+/// @author Kyle Scott (https://github.com/numoen/core/blob/main/src/Pair.sol)
 /// @author Modified from Uniswap (https://github.com/Uniswap/v2-core/blob/master/contracts/UniswapV2Pair.sol)
-/// and Primitive (https://github.com/primitivefinance/rmm-core/blob/main/contracts/PrimitiveEngine.sol), and Solmate
+/// Primitive (https://github.com/primitivefinance/rmm-core/blob/main/contracts/PrimitiveEngine.sol),
+/// and Solmate (https://github.com/transmissions11/solmate/blob/main/src/tokens/ERC20.sol)
 contract Pair {
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -55,9 +56,9 @@ contract Pair {
 
     address public immutable lendgine;
 
-    address public immutable token0;
+    address public immutable base;
 
-    address public immutable token1;
+    address public immutable speculative;
 
     uint256 public immutable upperBound;
 
@@ -92,7 +93,7 @@ contract Pair {
     constructor(address _factory) {
         lendgine = msg.sender;
         factory = _factory;
-        (token0, token1, upperBound) = Factory(factory).parameters();
+        (base, speculative, upperBound) = Factory(factory).parameters();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -100,9 +101,7 @@ contract Pair {
     //////////////////////////////////////////////////////////////*/
 
     function calcInvariant(uint256 r0, uint256 r1) public view returns (uint256 invariant) {
-        // console2.log("a", r0 + (upperBound * r1) / 1 ether);
-        // console2.log("b", (r1**2) / 4 ether);
-        invariant = 10**9 * r0 + (upperBound * r1) / (10**9) - (r1**2) / (4 * 10**9);
+        invariant = 10**18 * r0 + (upperBound * r1) - (r1**2) / 4;
     }
 
     function mint(
@@ -137,8 +136,8 @@ contract Pair {
 
         _burn(k);
 
-        SafeTransferLib.safeTransfer(ERC20(token0), to, amount0);
-        SafeTransferLib.safeTransfer(ERC20(token1), to, amount1);
+        SafeTransferLib.safeTransfer(ERC20(base), to, amount0);
+        SafeTransferLib.safeTransfer(ERC20(speculative), to, amount1);
 
         emit Burn(msg.sender, amount0, amount1, k, to);
     }
@@ -154,8 +153,8 @@ contract Pair {
         (uint256 balance0Before, uint256 balance1Before) = balances();
         uint256 invariantBefore = calcInvariant(balance0Before, balance1Before);
 
-        if (amount0Out > 0) SafeTransferLib.safeTransfer(ERC20(token0), to, amount0Out);
-        if (amount1Out > 0) SafeTransferLib.safeTransfer(ERC20(token1), to, amount1Out);
+        if (amount0Out > 0) SafeTransferLib.safeTransfer(ERC20(base), to, amount0Out);
+        if (amount1Out > 0) SafeTransferLib.safeTransfer(ERC20(speculative), to, amount1Out);
 
         ISwapCallback(msg.sender).SwapCallback(amount0Out, amount1Out, data);
 
@@ -165,9 +164,7 @@ contract Pair {
             amount1In = balance1After + amount1Out - balance1Before;
 
             uint256 invariantAfter = calcInvariant(balance0After, balance1After);
-            // console2.log("IB", invariantBefore);
-            // console2.log("IA", invariantAfter);
-            // console2.log("dif", invariantBefore - invariantAfter);
+
             if (invariantBefore > invariantAfter) revert InsufficientInputError();
         }
 
@@ -182,13 +179,13 @@ contract Pair {
         bool success;
         bytes memory data;
 
-        (success, data) = token0.staticcall(
+        (success, data) = base.staticcall(
             abi.encodeWithSelector(bytes4(keccak256(bytes("balanceOf(address)"))), address(this))
         );
         if (!success || data.length < 32) revert BalanceReturnError();
         uint256 balance0 = abi.decode(data, (uint256));
 
-        (success, data) = token1.staticcall(
+        (success, data) = speculative.staticcall(
             abi.encodeWithSelector(bytes4(keccak256(bytes("balanceOf(address)"))), address(this))
         );
         if (!success || data.length < 32) revert BalanceReturnError();
@@ -210,8 +207,8 @@ contract Pair {
     function _mint(uint256 amount) internal {
         totalSupply += amount;
 
-        // Cannot overflow because the sum of all user
-        // balances can't exceed the max uint256 value.
+        // Cannot overflow because the buffer
+        // can't exceed the max uint256 value.
         unchecked {
             buffer += amount;
         }
@@ -220,7 +217,7 @@ contract Pair {
     function _burn(uint256 amount) internal {
         buffer -= amount;
 
-        // Cannot underflow because a user's balance
+        // Cannot underflow because the buffer
         // will never be larger than the total supply.
         unchecked {
             totalSupply -= amount;
