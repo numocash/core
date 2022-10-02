@@ -10,16 +10,10 @@ import { Position } from "../src/libraries/Position.sol";
 import { LendgineAddress } from "../src/libraries/LendgineAddress.sol";
 
 contract DeployScript is Script {
-    function setUp() public {}
-
     function run() public {
         uint256 pk = vm.envUint("PRIVATE_KEY");
         vm.broadcast(pk);
-        // new Position();
-        // factory.createLendgine(0x471EcE3750Da237f93B8E339c536989b8978a438, 0x765DE816845861e75A25fCA122bb6898B8B1282a, 2.5 ether);
-
-        // address lendgine = LendgineAddress.computeAddress(0xb0C7E6bC7577706F766efA012f6604919056D0f7, 0x471EcE3750Da237f93B8E339c536989b8978a438, 0x765DE816845861e75A25fCA122bb6898B8B1282a, 2.5 ether);
-
-        // console2.log(Lendgine(lendgine).pair());
+        new Factory();
+        vm.broadcast(pk);
     }
 }
