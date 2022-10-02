@@ -4,10 +4,8 @@ pragma solidity ^0.8.4;
 import { Lendgine } from "./Lendgine.sol";
 import { Pair } from "./Pair.sol";
 
-import "forge-std/console2.sol";
-
 /// @notice Manages the recording and create of lending engines
-/// @author Kyle Scott (https://github.com/kyscott18/kyleswap2.5/blob/main/src/Factory.sol)
+/// @author Kyle Scott (https://github.com/numoen/core/blob/master/src/Factory.sol)
 /// @author Modified from Uniswap (https://github.com/Uniswap/v2-core/blob/master/contracts/UniswapV2Factory.sol)
 /// and Primitive (https://github.com/primitivefinance/rmm-core/blob/main/contracts/PrimitiveFactory.sol)
 contract Factory {
@@ -60,12 +58,10 @@ contract Factory {
         uint256 upperBound
     ) external returns (address _lendgine) {
         if (speculativeToken == baseToken) revert SameTokenError();
-
         if (speculativeToken == address(0) || baseToken == address(0)) revert ZeroAddressError();
         if (getLendgine[baseToken][speculativeToken][upperBound] != address(0)) revert DeployedError();
 
         parameters = Parameters({ baseToken: baseToken, speculativeToken: speculativeToken, upperBound: upperBound });
-
         _lendgine = address(new Lendgine{ salt: keccak256(abi.encode(baseToken, speculativeToken, upperBound)) }());
 
         delete parameters;

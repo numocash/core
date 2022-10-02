@@ -13,8 +13,8 @@ import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
 import { ERC20 } from "solmate/tokens/ERC20.sol";
 
 /// @notice A general purpose funding rate engine
-/// @author Kyle Scott (https://github.com/kyscott18/kyleswap2.5/blob/main/src/Pair.sol)
-/// @author Modified from Uniswap (https://github.com/Uniswap/v2-core/blob/master/contracts/UniswapV2Pair.sol)
+/// @author Kyle Scott (https://github.com/numoen/core/blob/master/src/Lendgine.sol)
+/// @author Modified from Uniswap (https://github.com/Uniswap/v3-core/blob/main/contracts/UniswapV3Pool.sol)
 /// and Primitive (https://github.com/primitivefinance/rmm-core/blob/main/contracts/PrimitiveEngine.sol)
 contract Lendgine is ERC20 {
     using Position for mapping(bytes32 => Position.Info);
