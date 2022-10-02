@@ -13,10 +13,12 @@ import { Test } from "forge-std/Test.sol";
 import "forge-std/console2.sol";
 
 abstract contract TestHelper is Test, CallbackHelper {
-    MockERC20 public immutable speculative;
     MockERC20 public immutable base;
+    MockERC20 public immutable speculative;
 
     uint256 public immutable upperBound = 5 ether;
+
+    uint256 public immutable k = 10**36 + (5 * 10**36) - (1 ether**2) / 4;
 
     address public immutable cuh;
     address public immutable dennis;
@@ -42,26 +44,39 @@ abstract contract TestHelper is Test, CallbackHelper {
         cuh = mkaddr("cuh");
         dennis = mkaddr("dennis");
 
-        key = LendgineAddress.getLendgineKey(address(speculative), address(base), upperBound);
+        key = LendgineAddress.getLendgineKey(address(base), address(speculative), upperBound);
     }
 
     function _setUp() internal {
         factory = new Factory();
 
-        (address _lendgine, address _pair) = factory.createLendgine(address(speculative), address(base), upperBound);
+        address _lendgine = factory.createLendgine(address(base), address(speculative), upperBound);
 
         lendgine = Lendgine(_lendgine);
+
+        address _pair = lendgine.pair();
 
         pair = Pair(_pair);
     }
 
     function _mintMaker(
-        uint256 amountSpeculative,
         uint256 amountBase,
+        uint256 amountSpeculative,
+        uint24 tick,
         address spender
     ) internal {
-        speculative.mint(spender, amountSpeculative);
+        _pairMint(amountBase, amountSpeculative, spender);
+
+        lendgine.mintMaker(spender, tick);
+    }
+
+    function _pairMint(
+        uint256 amountBase,
+        uint256 amountSpeculative,
+        address spender
+    ) internal {
         base.mint(spender, amountBase);
+        speculative.mint(spender, amountSpeculative);
 
         if (spender != address(this)) {
             vm.prank(spender);
@@ -71,24 +86,16 @@ abstract contract TestHelper is Test, CallbackHelper {
             base.approve(address(this), amountBase);
         }
 
-        uint256 liquidity = pair.mint(
-            amountSpeculative,
-            amountBase,
-            spender,
-            abi.encode(CallbackHelper.CallbackData({ key: key, payer: spender }))
-        );
-
-        if (spender != address(this)) {
-            vm.prank(spender);
-            pair.approve(address(this), liquidity);
-        }
-
-        lendgine.mintMaker(spender, liquidity, abi.encode(CallbackHelper.CallbackData({ key: key, payer: spender })));
+        pair.mint(amountBase, amountSpeculative, abi.encode(CallbackHelper.CallbackData({ key: key, payer: spender })));
     }
 
-    function _burnMaker(uint256 amountLP, address spender) internal {
+    function _burnMaker(
+        uint256 amountLP,
+        uint24 tick,
+        address spender
+    ) internal {
         vm.prank(spender);
-        lendgine.burnMaker(spender, amountLP);
+        lendgine.burnMaker(tick, amountLP);
     }
 
     function _mint(uint256 amount, address spender) internal {
@@ -98,19 +105,12 @@ abstract contract TestHelper is Test, CallbackHelper {
             vm.prank(spender);
             speculative.approve(address(this), amount);
         }
-
         lendgine.mint(spender, amount, abi.encode(CallbackHelper.CallbackData({ key: key, payer: spender })));
     }
 
     function _burn(uint256 amount, address spender) internal {
-        if (spender != address(this)) {
-            vm.prank(spender);
-            pair.approve(address(this), amount * 10);
-        }
-
         vm.prank(spender);
         lendgine.transfer(address(lendgine), amount);
-
-        lendgine.burn(spender, abi.encode(CallbackHelper.CallbackData({ key: key, payer: spender })));
+        lendgine.burn(spender);
     }
 }

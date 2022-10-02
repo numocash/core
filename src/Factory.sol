@@ -16,11 +16,10 @@ contract Factory {
     //////////////////////////////////////////////////////////////*/
 
     event LendgineCreated(
-        address indexed speculativeToken,
         address indexed baseToken,
+        address indexed speculativeToken,
         uint256 indexed upperBound,
-        address lendgine,
-        address pair
+        address lendgine
     );
 
     /*//////////////////////////////////////////////////////////////
@@ -44,40 +43,35 @@ contract Factory {
     //////////////////////////////////////////////////////////////*/
 
     struct Parameters {
-        address speculativeToken;
         address baseToken;
+        address speculativeToken;
         uint256 upperBound;
     }
 
     Parameters public parameters;
-
-    address public pair;
 
     /*//////////////////////////////////////////////////////////////
                               FACTORY LOGIC
     //////////////////////////////////////////////////////////////*/
 
     function createLendgine(
-        address speculativeToken,
         address baseToken,
+        address speculativeToken,
         uint256 upperBound
-    ) external returns (address _lendgine, address _pair) {
+    ) external returns (address _lendgine) {
         if (speculativeToken == baseToken) revert SameTokenError();
 
         if (speculativeToken == address(0) || baseToken == address(0)) revert ZeroAddressError();
-        if (getLendgine[speculativeToken][baseToken][upperBound] != address(0)) revert DeployedError();
+        if (getLendgine[baseToken][speculativeToken][upperBound] != address(0)) revert DeployedError();
 
-        parameters = Parameters({ speculativeToken: speculativeToken, baseToken: baseToken, upperBound: upperBound });
+        parameters = Parameters({ baseToken: baseToken, speculativeToken: speculativeToken, upperBound: upperBound });
 
-        _pair = address(new Pair{ salt: keccak256(abi.encode(speculativeToken, baseToken, upperBound)) }());
-        pair = _pair;
-        _lendgine = address(new Lendgine{ salt: keccak256(abi.encode(speculativeToken, baseToken, upperBound)) }());
+        _lendgine = address(new Lendgine{ salt: keccak256(abi.encode(baseToken, speculativeToken, upperBound)) }());
 
         delete parameters;
-        delete pair;
 
-        getLendgine[speculativeToken][baseToken][upperBound] = _lendgine;
+        getLendgine[baseToken][speculativeToken][upperBound] = _lendgine;
 
-        emit LendgineCreated(speculativeToken, baseToken, upperBound, _lendgine, _pair);
+        emit LendgineCreated(baseToken, speculativeToken, upperBound, _lendgine);
     }
 }

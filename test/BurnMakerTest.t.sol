@@ -17,78 +17,69 @@ contract BurnMakerTest is TestHelper {
     function setUp() public {
         _setUp();
 
-        _mintMaker(1 ether, 1 ether, cuh);
+        _mintMaker(1 ether, 1 ether, 1, cuh);
 
-        positionID = Position.getId(cuh);
+        positionID = Position.getId(cuh, 1);
     }
 
     function testBurnMakerPartial() public {
-        _burnMaker(1 ether - 500, cuh);
+        _burnMaker(k / 2, 1, cuh);
 
-        assertEq(pair.balanceOf(cuh), 1 ether - 500);
-        assertEq(pair.balanceOf(address(lendgine)), 1 ether - 500);
-        assertEq(pair.totalSupply(), 2 ether);
+        assertEq(pair.buffer(), k / 2);
 
-        (
-            bytes32 next,
-            bytes32 previous,
-            uint256 liquidity,
-            uint256 tokensOwed,
-            uint256 rewardPerTokenPaid,
-            bool utilized
-        ) = lendgine.positions(positionID);
+        assertEq(pair.totalSupply(), k);
 
-        assertEq(next, bytes32(0));
-        assertEq(previous, bytes32(0));
-        assertEq(liquidity, 1 ether - 500);
+        (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(positionID);
+
+        assertEq(liquidity, k / 2);
+        assertEq(rewardPerLiquidityPaid, 0);
         assertEq(tokensOwed, 0);
-        assertEq(rewardPerTokenPaid, 0);
-        assertEq(utilized, false);
 
-        assertEq(lendgine.lastPosition(), positionID);
-        assertEq(lendgine.currentPosition(), positionID);
+        (uint256 tickLiquidity, uint256 rewardPerINPaid, uint256 tokensOwedPerLiquidity) = lendgine.ticks(1);
+
+        assertEq(tickLiquidity, k / 2);
+        assertEq(rewardPerINPaid, 0);
+        assertEq(tokensOwedPerLiquidity, 0);
+
+        assertEq(lendgine.currentTick(), 1);
         assertEq(lendgine.currentLiquidity(), 0);
-        assertEq(lendgine.rewardPerTokenStored(), 0);
+        assertEq(lendgine.rewardPerINStored(), 0);
         assertEq(lendgine.lastUpdate(), 0);
+        assertEq(lendgine.interestNumerator(), 0);
     }
 
     function testBurnMakerFull() public {
-        _burnMaker(2 ether - 1000, cuh);
+        _burnMaker(k, 1, cuh);
 
-        assertEq(pair.balanceOf(cuh), 2 ether - 1000);
-        assertEq(pair.balanceOf(address(lendgine)), 0 ether);
-        assertEq(pair.totalSupply(), 2 ether);
+        assertEq(pair.buffer(), k);
+        assertEq(pair.totalSupply(), k);
 
-        (
-            bytes32 next,
-            bytes32 previous,
-            uint256 liquidity,
-            uint256 tokensOwed,
-            uint256 rewardPerTokenPaid,
-            bool utilized
-        ) = lendgine.positions(positionID);
+        (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(positionID);
 
-        assertEq(next, bytes32(0));
-        assertEq(previous, bytes32(0));
         assertEq(liquidity, 0 ether);
+        assertEq(rewardPerLiquidityPaid, 0);
         assertEq(tokensOwed, 0);
-        assertEq(rewardPerTokenPaid, 0);
-        assertEq(utilized, false);
 
-        assertEq(lendgine.lastPosition(), bytes32(0));
-        assertEq(lendgine.currentPosition(), bytes32(0));
+        (uint256 tickLiquidity, uint256 rewardPerINPaid, uint256 tokensOwedPerLiquidity) = lendgine.ticks(1);
+
+        assertEq(tickLiquidity, 0 ether);
+        assertEq(rewardPerINPaid, 0);
+        assertEq(tokensOwedPerLiquidity, 0);
+
+        assertEq(lendgine.currentTick(), 1);
         assertEq(lendgine.currentLiquidity(), 0);
-        assertEq(lendgine.rewardPerTokenStored(), 0);
+        assertEq(lendgine.rewardPerINStored(), 0);
         assertEq(lendgine.lastUpdate(), 0);
+        assertEq(lendgine.interestNumerator(), 0);
     }
 
     function testZeroBurn() public {
         vm.expectRevert(Lendgine.InsufficientOutputError.selector);
-        lendgine.burnMaker(cuh, 0 ether);
+        lendgine.burnMaker(1, 0 ether);
     }
 
     // function testOverBurn() public {
     //     vm.expectRevert(Lendgine.InsufficientPositionError.selector);
-    //     _burnMaker(2 ether, cuh);
+    //     _burnMaker(2 ether, 1, cuh);
     // }
 }

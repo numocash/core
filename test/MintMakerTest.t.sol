@@ -19,8 +19,8 @@ contract MintMakerTest is TestHelper {
     function testAddress() public {
         address estimate = LendgineAddress.computeAddress(
             address(factory),
-            address(speculative),
             address(base),
+            address(speculative),
             upperBound
         );
 
@@ -31,53 +31,48 @@ contract MintMakerTest is TestHelper {
         assertEq(lendgine.factory(), address(factory));
         assertEq(lendgine.pair(), address(pair));
 
-        assertEq(pair.token0(), address(speculative));
-        assertEq(pair.token1(), address(base));
+        assertEq(pair.speculative(), address(speculative));
+        assertEq(pair.base(), address(base));
         assertEq(pair.upperBound(), upperBound);
     }
 
     function testPositionID() public {
-        bytes32 positionID = Position.getId(cuh);
+        bytes32 positionID = Position.getId(cuh, 1);
 
-        bytes32 estimate = keccak256(abi.encodePacked(cuh));
+        bytes32 estimate = keccak256(abi.encode(cuh, 1));
 
         assertEq(positionID, estimate);
     }
 
     function testPositionsInit() public {
-        _mintMaker(1 ether, 1 ether, cuh);
+        _mintMaker(1 ether, 1 ether, 1, cuh);
 
-        bytes32 positionID = Position.getId(cuh);
+        bytes32 positionID = Position.getId(cuh, 1);
 
-        (
-            bytes32 next,
-            bytes32 previous,
-            uint256 liquidity,
-            uint256 tokensOwed,
-            uint256 rewardPerTokenPaid,
-            bool utilized
-        ) = lendgine.positions(positionID);
+        (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(positionID);
 
-        assertEq(next, bytes32(0));
-        assertEq(previous, bytes32(0));
-        assertEq(liquidity, 2 ether - 1000);
+        assertEq(liquidity, k);
+        assertEq(rewardPerLiquidityPaid, 0);
         assertEq(tokensOwed, 0);
-        assertEq(rewardPerTokenPaid, 0);
-        assertEq(utilized, false);
 
-        assertEq(lendgine.lastPosition(), positionID);
-        assertEq(lendgine.currentPosition(), positionID);
+        (uint256 tickLiquidity, uint256 rewardPerINPaid, uint256 tokensOwedPerLiquidity) = lendgine.ticks(1);
+
+        assertEq(tickLiquidity, k);
+        assertEq(rewardPerINPaid, 0);
+        assertEq(tokensOwedPerLiquidity, 0);
+
+        assertEq(lendgine.currentTick(), 1);
         assertEq(lendgine.currentLiquidity(), 0);
-        assertEq(lendgine.rewardPerTokenStored(), 0);
+        assertEq(lendgine.rewardPerINStored(), 0);
         assertEq(lendgine.lastUpdate(), 0);
+        assertEq(lendgine.interestNumerator(), 0);
 
-        assertEq(pair.balanceOf(address(lendgine)), 2 ether - 1000);
-        assertEq(pair.balanceOf(cuh), 0 ether);
-        assertEq(pair.totalSupply(), 2 ether);
+        assertEq(pair.buffer(), 0 ether);
+        assertEq(pair.totalSupply(), k);
     }
 
     function testZeroMint() public {
         vm.expectRevert(Lendgine.InsufficientOutputError.selector);
-        lendgine.mintMaker(cuh, 0 ether, abi.encode(CallbackHelper.CallbackData({ key: key, payer: cuh })));
+        lendgine.mintMaker(cuh, 1);
     }
 }

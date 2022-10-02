@@ -2,26 +2,24 @@
 pragma solidity ^0.8.4;
 
 import { Factory } from "./Factory.sol";
+import { Lendgine } from "./Lendgine.sol";
 
 import { IPairMintCallback } from "./interfaces/IPairMintCallback.sol";
 import { ISwapCallback } from "./interfaces/ISwapCallback.sol";
 
-import { Math } from "./libraries/Math.sol";
-
 import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
 import { ERC20 } from "solmate/tokens/ERC20.sol";
 
-import "forge-std/console2.sol";
-
-/// @notice A general purpose and gas efficient CFMM pair
-/// @author Kyle Scott (https://github.com/kyscott18/kyleswap2.5/blob/main/src/Pair.sol)
+/// @notice A gas efficient and opinionated capped power invariant pair
+/// @author Kyle Scott (https://github.com/numoen/core/blob/master/src/Pair.sol)
 /// @author Modified from Uniswap (https://github.com/Uniswap/v2-core/blob/master/contracts/UniswapV2Pair.sol)
-/// and Primitive (https://github.com/primitivefinance/rmm-core/blob/main/contracts/PrimitiveEngine.sol)
-contract Pair is ERC20 {
+/// Primitive (https://github.com/primitivefinance/rmm-core/blob/main/contracts/PrimitiveEngine.sol),
+/// and Solmate (https://github.com/transmissions11/solmate/blob/main/src/tokens/ERC20.sol)
+contract Pair {
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
-    event Mint(address indexed sender, uint256 amount0, uint256 amount1, uint256 liquidity, address indexed to);
+    event Mint(address indexed sender, uint256 amount0, uint256 amount1, uint256 liquidity);
 
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, uint256 liquidity, address indexed to);
 
@@ -46,19 +44,29 @@ contract Pair is ERC20 {
 
     error BalanceReturnError();
 
+    error LendgineError();
+
     /*//////////////////////////////////////////////////////////////
                                IMMUTABLES
     //////////////////////////////////////////////////////////////*/
 
-    uint256 public constant MINIMUM_LIQUIDITY = 10**3;
-
     address public immutable factory;
 
-    address public immutable token0;
+    address public immutable lendgine;
 
-    address public immutable token1;
+    address public immutable base;
+
+    address public immutable speculative;
 
     uint256 public immutable upperBound;
+
+    /*//////////////////////////////////////////////////////////////
+                                 STORAGE
+    //////////////////////////////////////////////////////////////*/
+
+    uint256 public totalSupply;
+
+    uint256 public buffer;
 
     /*//////////////////////////////////////////////////////////////
                            REENTRANCY LOGIC
@@ -80,35 +88,30 @@ contract Pair is ERC20 {
                                CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
-    constructor() ERC20("Numoen LP", "NLP", 18) {
-        factory = msg.sender;
-        (token0, token1, upperBound) = Factory(msg.sender).parameters();
+    constructor(address _factory) {
+        lendgine = msg.sender;
+        factory = _factory;
+        (base, speculative, upperBound) = Factory(factory).parameters();
     }
 
     /*//////////////////////////////////////////////////////////////
                               PAIR LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    function calcInvariant(uint256 r0, uint256 r1) public view returns (uint256 invariant) {
+        invariant = 10**18 * r0 + (upperBound * r1) - (r1**2) / 4;
+    }
+
     function mint(
         uint256 amount0,
         uint256 amount1,
-        address to,
         bytes calldata data
     ) external lock returns (uint256 liquidity) {
         (uint256 balance0Before, uint256 balance1Before) = balances();
-
-        uint256 _totalSupply = totalSupply;
-        if (_totalSupply == 0) {
-            liquidity = (amount0 + amount1) - MINIMUM_LIQUIDITY;
-
-            // liquidity = (amount0 + (upperBound - amount1 / 2)**2) - MINIMUM_LIQUIDITY;
-            _mint(address(0), MINIMUM_LIQUIDITY); // permanently lock the first MINIMUM_LIQUIDITY tokens
-        } else {
-            liquidity = Math.min((amount0 * _totalSupply) / balance0Before, (amount1 * _totalSupply) / balance1Before);
-        }
+        liquidity = calcInvariant(amount0, amount1);
 
         if (liquidity == 0) revert InsufficientOutputError();
-        _mint(to, liquidity); // optimistic mint
+        _mint(liquidity); // optimistic mint
 
         IPairMintCallback(msg.sender).PairMintCallback(amount0, amount1, data);
 
@@ -117,40 +120,39 @@ contract Pair is ERC20 {
         if (balance0After - balance0Before < amount0) revert InsufficientInputError();
         if (balance1After - balance1Before < amount1) revert InsufficientInputError();
 
-        emit Mint(msg.sender, amount0, amount1, liquidity, to);
+        emit Mint(msg.sender, amount0, amount1, liquidity);
     }
 
-    function burn(address to) external lock returns (uint256 amount0, uint256 amount1) {
-        (uint256 balance0, uint256 balance1) = balances();
-
-        uint256 liquidity = balanceOf[address(this)];
-        uint256 _totalSupply = totalSupply;
-        amount0 = (liquidity * balance0) / _totalSupply;
-        amount1 = (liquidity * balance1) / _totalSupply;
-
+    function burn(
+        address to,
+        uint256 amount0,
+        uint256 amount1
+    ) external lock returns (uint256 k) {
         if (amount0 == 0 && amount1 == 0) revert InsufficientOutputError();
 
-        _burn(address(this), liquidity); // burn from self for composability
+        k = calcInvariant(amount0, amount1);
 
-        SafeTransferLib.safeTransfer(ERC20(token0), to, amount0);
-        SafeTransferLib.safeTransfer(ERC20(token1), to, amount1);
+        _burn(k);
 
-        emit Burn(msg.sender, amount0, amount1, liquidity, to);
+        SafeTransferLib.safeTransfer(ERC20(base), to, amount0);
+        SafeTransferLib.safeTransfer(ERC20(speculative), to, amount1);
+
+        emit Burn(msg.sender, amount0, amount1, k, to);
     }
 
     function swap(
+        address to,
         uint256 amount0Out,
         uint256 amount1Out,
-        address to,
         bytes calldata data
     ) external lock returns (uint256 amount0In, uint256 amount1In) {
         if (amount0Out == 0 && amount1Out == 0) revert InsufficientOutputError();
 
         (uint256 balance0Before, uint256 balance1Before) = balances();
-        uint256 invariantBefore = balance0Before - (upperBound - balance1Before / 2)**2;
+        uint256 invariantBefore = calcInvariant(balance0Before, balance1Before);
 
-        if (amount0Out > 0) SafeTransferLib.safeTransfer(ERC20(token0), to, amount0Out);
-        if (amount1Out > 0) SafeTransferLib.safeTransfer(ERC20(token1), to, amount1Out);
+        if (amount0Out > 0) SafeTransferLib.safeTransfer(ERC20(base), to, amount0Out);
+        if (amount1Out > 0) SafeTransferLib.safeTransfer(ERC20(speculative), to, amount1Out);
 
         ISwapCallback(msg.sender).SwapCallback(amount0Out, amount1Out, data);
 
@@ -159,7 +161,7 @@ contract Pair is ERC20 {
             amount0In = balance0After + amount0Out - balance0Before;
             amount1In = balance1After + amount1Out - balance1Before;
 
-            uint256 invariantAfter = balance0After - (upperBound - balance1After / 2)**2;
+            uint256 invariantAfter = calcInvariant(balance0After, balance1After);
 
             if (invariantBefore > invariantAfter) revert InsufficientInputError();
         }
@@ -175,17 +177,64 @@ contract Pair is ERC20 {
         bool success;
         bytes memory data;
 
-        (success, data) = token0.staticcall(
+        (success, data) = base.staticcall(
             abi.encodeWithSelector(bytes4(keccak256(bytes("balanceOf(address)"))), address(this))
         );
         if (!success || data.length < 32) revert BalanceReturnError();
         uint256 balance0 = abi.decode(data, (uint256));
 
-        (success, data) = token1.staticcall(
+        (success, data) = speculative.staticcall(
             abi.encodeWithSelector(bytes4(keccak256(bytes("balanceOf(address)"))), address(this))
         );
         if (!success || data.length < 32) revert BalanceReturnError();
 
         return (balance0, abi.decode(data, (uint256)));
+    }
+
+    function lendgineBalance() external view returns (uint256) {
+        uint256 _totalSupply = totalSupply; // SLOAD for gas optimization
+        if (_totalSupply == 0) return 0;
+
+        return _totalSupply - buffer;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        INTERNAL MINT/BURN LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function _mint(uint256 amount) internal {
+        totalSupply += amount;
+
+        // Cannot overflow because the buffer
+        // can't exceed the max uint256 value.
+        unchecked {
+            buffer += amount;
+        }
+    }
+
+    function _burn(uint256 amount) internal {
+        buffer -= amount;
+
+        // Cannot underflow because the buffer
+        // will never be larger than the total supply.
+        unchecked {
+            totalSupply -= amount;
+        }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                             BUFFER LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function addBuffer(uint256 amount) external {
+        if (msg.sender != lendgine) revert LendgineError();
+
+        buffer += amount;
+    }
+
+    function removeBuffer(uint256 amount) external {
+        if (msg.sender != lendgine) revert LendgineError();
+
+        buffer -= amount;
     }
 }
