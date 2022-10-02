@@ -331,11 +331,11 @@ contract Lendgine is ERC20 {
     }
 
     function speculativeForLP(uint256 _lpAmount) public view returns (uint256) {
-        return (2 * _lpAmount * Pair(pair).upperBound()) / 1 ether;
+        return (2 * _lpAmount * Pair(pair).upperBound()) / 10**36;
     }
 
     function lpForSpeculative(uint256 _speculativeAmount) public view returns (uint256) {
-        return (_speculativeAmount * 1 ether) / (2 * Pair(pair).upperBound());
+        return (_speculativeAmount * 1 ether * 1 ether) / (2 * Pair(pair).upperBound());
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -371,7 +371,7 @@ contract Lendgine is ERC20 {
 
         interestNumeratorDelta += _currentTick * remainingLP;
         currentTick = _currentTick;
-        currentLiquidity = remainingLP;
+        currentLiquidity += remainingLP;
     }
 
     /// @dev assumed to never decrease past zero
@@ -421,7 +421,7 @@ contract Lendgine is ERC20 {
         uint256 dilutionLP = (interestNumerator * timeElapsed) / (1 days * 10_000);
         uint256 dilutionSpeculative = speculativeForLP(dilutionLP);
 
-        rewardPerINStored += (dilutionSpeculative * 1 ether) / interestNumerator;
+        rewardPerINStored += (dilutionSpeculative * 1 ether * 1 ether) / interestNumerator;
 
         _accrueTickInterest(currentTick);
 
@@ -481,7 +481,8 @@ contract Lendgine is ERC20 {
     function newTokensOwed(Position.Info memory position, Tick.Info memory tickInfo) private pure returns (uint256) {
         uint256 liquidity = position.liquidity;
 
-        uint256 owed = (liquidity * (tickInfo.tokensOwedPerLiquidity - position.rewardPerLiquidityPaid)) / 1 ether;
+        uint256 owed = (liquidity * (tickInfo.tokensOwedPerLiquidity - position.rewardPerLiquidityPaid)) /
+            (1 ether * 1 ether);
         return owed;
     }
 }

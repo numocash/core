@@ -32,7 +32,7 @@ abstract contract CallbackHelper is IMintCallback, IPairMintCallback {
         CallbackData memory decoded = abi.decode(data, (CallbackData));
         // CallbackValidation.verifyCallback(factory, decoded.poolKey);
 
-        if (amount > 0) pay(ERC20(decoded.key.base), decoded.payer, msg.sender, amount);
+        if (amount > 0) pay(ERC20(decoded.key.speculative), decoded.payer, msg.sender, amount);
     }
 
     /// @param token The token to pay

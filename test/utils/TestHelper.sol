@@ -105,14 +105,12 @@ abstract contract TestHelper is Test, CallbackHelper {
             vm.prank(spender);
             speculative.approve(address(this), amount);
         }
-
         lendgine.mint(spender, amount, abi.encode(CallbackHelper.CallbackData({ key: key, payer: spender })));
     }
 
     function _burn(uint256 amount, address spender) internal {
         vm.prank(spender);
         lendgine.transfer(address(lendgine), amount);
-
         lendgine.burn(spender);
     }
 }

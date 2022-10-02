@@ -33,37 +33,37 @@ contract CollectTest is TestHelper {
 
         lendgine.accrueMakerInterest(positionID, 1);
 
-        uint256 dilution = (0.1 ether) / 10000;
+        uint256 dilution = 10**35 / 10000;
 
         vm.prank(cuh);
         lendgine.collectMaker(cuh, 1);
 
         // Test lendgine token
-        assertEq(lendgine.totalSupply(), 0.1 ether);
-        assertEq(lendgine.balanceOf(cuh), 0.1 ether);
+        assertEq(lendgine.totalSupply(), 0.1 ether * 1 ether);
+        assertEq(lendgine.balanceOf(cuh), 0.1 ether * 1 ether);
         assertEq(lendgine.balanceOf(address(lendgine)), 0 ether);
 
         assertEq(speculative.totalSupply(), 2 ether);
-        assertEq(speculative.balanceOf(cuh), dilution * 10);
-        assertEq(speculative.balanceOf(address(lendgine)), 1 ether - dilution * 10);
+        assertEq(speculative.balanceOf(cuh), (dilution * 10) / 1 ether);
+        assertEq(speculative.balanceOf(address(lendgine)), 1 ether - (dilution * 10) / 1 ether);
 
         (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(positionID);
 
-        assertEq(liquidity, 2 ether - 1000);
-        assertEq(rewardPerLiquidityPaid, (dilution * 10 * 1 ether) / (2 ether - 1000));
+        assertEq(liquidity, k);
+        assertEq(rewardPerLiquidityPaid, (dilution * 10 * 1 ether) / (k));
+        // TODO: rounding error
         assertEq(tokensOwed, 0);
 
         (uint256 tickLiquidity, uint256 rewardPerINPaid, uint256 tokensOwedPerLiquidity) = lendgine.ticks(1);
 
-        assertEq(tickLiquidity, 2 ether - 1000);
-        assertEq(rewardPerINPaid, (dilution * 10 * 1 ether) / (0.1 ether));
-        // TODO: rounding error here
-        assertEq(tokensOwedPerLiquidity, (dilution * 10 * 1 ether) / (2 ether - 1000));
+        assertEq(tickLiquidity, k);
+        assertEq(rewardPerINPaid, (dilution * 10) / (0.1 ether));
+        assertEq(tokensOwedPerLiquidity, (dilution * 10 * 1 ether) / (k));
 
         // Test global storage values
         assertEq(lendgine.currentTick(), 1);
-        assertEq(lendgine.currentLiquidity(), 0.1 ether - dilution);
-        assertEq(lendgine.rewardPerINStored(), (dilution * 10 * 1 ether) / (0.1 ether));
+        assertEq(lendgine.currentLiquidity(), 0.1 ether * 1 ether - dilution);
+        assertEq(lendgine.rewardPerINStored(), (dilution * 10 * 1 ether) / (10**35));
         assertEq(lendgine.lastUpdate(), 1 days + 1);
     }
 }
