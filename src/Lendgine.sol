@@ -12,8 +12,6 @@ import { Tick } from "./libraries/Tick.sol";
 import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
 import { ERC20 } from "solmate/tokens/ERC20.sol";
 
-import "forge-std/console2.sol";
-
 /// @notice A general purpose funding rate engine
 /// @author Kyle Scott (https://github.com/kyscott18/kyleswap2.5/blob/main/src/Pair.sol)
 /// @author Modified from Uniswap (https://github.com/Uniswap/v2-core/blob/master/contracts/UniswapV2Pair.sol)
@@ -355,19 +353,16 @@ contract Lendgine is ERC20 {
             if (remainingCurrentLiquidity >= remainingLP) {
                 break;
             } else {
-                // if (!currentPositionInfo.utilized) positions[currentId].utilized = true;
+                interestNumeratorDelta += _currentTick * remainingCurrentLiquidity;
 
                 _currentTick = _currentTick + 1;
-                // if (currentId == bytes32(0)) revert CompleteUtilizationError();
                 // TODO: error when max tick is reached
                 currentTickInfo = ticks[_currentTick];
 
-                interestNumeratorDelta += _currentTick * remainingCurrentLiquidity;
                 remainingLP -= remainingCurrentLiquidity;
                 remainingCurrentLiquidity = currentTickInfo.liquidity;
             }
         }
-        // if (!currentPositionInfo.utilized && remainingLP != 0) positions[currentId].utilized = true;
 
         interestNumeratorDelta += _currentTick * remainingLP;
         currentTick = _currentTick;
@@ -386,10 +381,6 @@ contract Lendgine is ERC20 {
             if (remainingCurrentLiquidity >= remainingLP) {
                 break;
             } else {
-                // positions[currentId].utilized = false;
-
-                // if (currentPositionInfo.previous == bytes32(0)) revert OutOfBoundsError();
-
                 interestNumeratorDelta += _currentTick * remainingCurrentLiquidity;
 
                 // should never underflow
@@ -401,7 +392,6 @@ contract Lendgine is ERC20 {
                 _accrueTickInterest(_currentTick);
             }
         }
-        // if (remainingCurrentLiquidity == remainingLP) positions[currentId].utilized = false;
 
         interestNumeratorDelta += _currentTick * remainingLP;
         currentTick = _currentTick;
