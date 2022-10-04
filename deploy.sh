@@ -1,0 +1,1 @@
+forge script script/Deploy.s.sol:DeployScript --rpc-url https://forno.celo.org --broadcast --legacy
