@@ -110,7 +110,9 @@ abstract contract TestHelper is Test, CallbackHelper {
 
     function _burn(uint256 amount, address spender) internal {
         vm.prank(spender);
-        lendgine.transfer(address(lendgine), amount);
+        lendgine.approve(address(this), amount);
+
+        lendgine.transferFrom(spender, address(lendgine), amount);
         lendgine.burn(spender);
     }
 }

@@ -24,6 +24,14 @@ contract InvariantTest is TestHelper {
         assertEq(pair.buffer(), k);
     }
 
+    function testMintUpperBound() public {
+        _pairMint(0 ether, 2 * upperBound, cuh);
+    }
+
+    function testFailUpperBound() public {
+        _pairMint(0 ether, 2 * upperBound + 1, cuh);
+    }
+
     function testBurnAmount() public {
         _pairMint(1 ether, 1 ether, cuh);
         uint256 amount0 = 1 ether;
@@ -153,8 +161,6 @@ contract InvariantTest is TestHelper {
 
         console2.log(p);
     }
-
-    // test swap to the upper bound
 
     function testSwapUpperBound() public {
         uint256 rB = 0 ether;

@@ -46,6 +46,8 @@ contract Pair {
 
     error LendgineError();
 
+    error MaxSpeculativeError();
+
     /*//////////////////////////////////////////////////////////////
                                IMMUTABLES
     //////////////////////////////////////////////////////////////*/
@@ -99,6 +101,8 @@ contract Pair {
     //////////////////////////////////////////////////////////////*/
 
     function calcInvariant(uint256 r0, uint256 r1) public view returns (uint256 invariant) {
+        // assert on r1 < g(p0)
+        if (r1 > 2 * upperBound) revert MaxSpeculativeError();
         invariant = 10**18 * r0 + (upperBound * r1) - (r1**2) / 4;
     }
 
