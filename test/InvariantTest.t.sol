@@ -94,7 +94,7 @@ contract InvariantTest is TestHelper {
 
     function testSwap() public {
         uint256 rB = 0 ether;
-        uint256 rS = 2 ether;
+        uint256 rS = 10 ether;
         _pairMint(rB, rS, cuh);
 
         uint256 amountSOut = 0.00001 ether;
@@ -121,8 +121,8 @@ contract InvariantTest is TestHelper {
     }
 
     function testPrice() public {
-        uint256 rB = 0 ether;
-        uint256 rS = 2 ether;
+        uint256 rB = 1_000_000 ether;
+        uint256 rS = 10 ether;
         _pairMint(rB, rS, cuh);
 
         uint256 amountSOut = .00000001 ether;
