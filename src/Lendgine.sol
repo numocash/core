@@ -31,9 +31,9 @@ contract Lendgine is ERC20 {
 
     event Burn(address indexed sender, address indexed to, uint256 amountShares, uint256 amountSpeculative);
 
-    event MintMaker(address indexed sender, address indexed to, uint256 amountLP);
+    event MintMaker(address indexed sender, address indexed to, uint256 amountLP, uint24 tick); // add ticks to events
 
-    event BurnMaker(address indexed to, uint256 amountLP);
+    event BurnMaker(address indexed to, uint256 amountLP, uint24 tick);
 
     event AccrueInterest();
 
@@ -218,7 +218,7 @@ contract Lendgine is ERC20 {
 
         Pair(pair).removeBuffer(amountLP);
 
-        emit MintMaker(msg.sender, recipient, amountLP);
+        emit MintMaker(msg.sender, recipient, amountLP, tick);
     }
 
     function burnMaker(uint24 tick, uint256 amountLP) external lock {
@@ -275,7 +275,7 @@ contract Lendgine is ERC20 {
 
         Pair(pair).addBuffer(amountLP);
 
-        emit BurnMaker(msg.sender, amountLP);
+        emit BurnMaker(msg.sender, amountLP, tick);
     }
 
     function accrueInterest() external lock {
