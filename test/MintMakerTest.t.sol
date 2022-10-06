@@ -24,6 +24,7 @@ contract MintMakerTest is TestHelper {
             upperBound
         );
 
+        assertEq(factory.getLendgine(address(base), address(speculative), upperBound), estimate);
         assertEq(estimate, address(lendgine));
     }
 

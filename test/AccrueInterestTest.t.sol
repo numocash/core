@@ -78,6 +78,7 @@ contract AccrueInterestTest is TestHelper {
         assertEq(lendgine.rewardPerINStored(), 0);
         assertEq(lendgine.lastUpdate(), 1);
         assertEq(lendgine.interestNumerator(), 10**35);
+        assertEq(lendgine.totalLiquidityBorrowed(), 10**35);
     }
 
     function testAccrueInterstTime() public {
@@ -115,6 +116,8 @@ contract AccrueInterestTest is TestHelper {
         assertEq(lendgine.currentLiquidity(), 0.1 ether * 1 ether - dilution);
         assertEq(lendgine.rewardPerINStored(), (dilution * 10 * 1 ether) / (10**35));
         assertEq(lendgine.lastUpdate(), 1 days + 1);
+        assertEq(lendgine.interestNumerator(), 0.1 ether * 1 ether - dilution);
+        assertEq(lendgine.totalLiquidityBorrowed(), 0.1 ether * 1 ether - dilution);
     }
 
     // calling accrue interest twice

@@ -416,6 +416,7 @@ contract Lendgine is ERC20 {
         _accrueTickInterest(currentTick);
 
         uint256 interestNumeratorDelta = decreaseCurrentLiquidity(dilutionLP);
+        totalLiquidityBorrowed -= dilutionLP;
         interestNumerator -= interestNumeratorDelta;
 
         // TODO: dilution > baseReserves;
@@ -433,9 +434,10 @@ contract Lendgine is ERC20 {
         uint256 tokensOwed = newTokensOwed(_tickInfo, tick);
 
         tickInfo.rewardPerINPaid = rewardPerINStored;
-        tickInfo.tokensOwedPerLiquidity =
-            _tickInfo.tokensOwedPerLiquidity +
-            ((tokensOwed * 1 ether) / _tickInfo.liquidity);
+        if (tokensOwed > 0)
+            tickInfo.tokensOwedPerLiquidity =
+                _tickInfo.tokensOwedPerLiquidity +
+                ((tokensOwed * 1 ether) / _tickInfo.liquidity);
 
         emit AccrueMakerInterest();
     }
