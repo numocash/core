@@ -133,10 +133,11 @@ contract Pair {
         uint256 liquidity,
         bytes calldata data
     ) external lock {
+        if (liquidity == 0) revert InsufficientOutputError();
+
         (uint256 balance0Before, uint256 balance1Before) = balances();
         if (!verifyInvariant(amount0, amount1, liquidity)) revert InvariantError();
 
-        if (liquidity == 0) revert InsufficientOutputError();
         _mint(liquidity); // optimistic mint
 
         IPairMintCallback(msg.sender).PairMintCallback(amount0, amount1, data);
@@ -153,8 +154,6 @@ contract Pair {
         (uint256 balance0, uint256 balance1) = balances();
         uint256 liquidity = buffer;
         uint256 _totalSupply = totalSupply;
-
-        // if (!verifyInvariant(balance0, balance1, _totalSupply)) revert InvariantError();
 
         amount0 = (liquidity * balance0) / _totalSupply;
         amount1 = (liquidity * balance1) / _totalSupply;
@@ -176,17 +175,13 @@ contract Pair {
     ) external lock {
         if (amount0Out == 0 && amount1Out == 0) revert InsufficientOutputError();
 
-        uint256 _totalSupply = totalSupply;
-        // (uint256 balance0Before, uint256 balance1Before) = balances();
-        // if (!verifyInvariant(balance0Before, balance1Before, _totalSupply)) revert InvariantError();
-
         if (amount0Out > 0) SafeTransferLib.safeTransfer(ERC20(base), to, amount0Out);
         if (amount1Out > 0) SafeTransferLib.safeTransfer(ERC20(speculative), to, amount1Out);
 
         ISwapCallback(msg.sender).SwapCallback(amount0Out, amount1Out, data);
 
         (uint256 balance0After, uint256 balance1After) = balances();
-        if (!verifyInvariant(balance0After, balance1After, _totalSupply)) revert InvariantError();
+        if (!verifyInvariant(balance0After, balance1After, totalSupply)) revert InvariantError();
 
         emit Swap(msg.sender, amount0Out, amount1Out, to);
     }

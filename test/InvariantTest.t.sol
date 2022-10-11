@@ -33,6 +33,79 @@ contract InvariantTest is TestHelper {
         _pairMint(0 ether, 2 * upperBound, 10**9, cuh);
     }
 
+    function testTooLargeScale() public {
+        base.mint(cuh, 9 ether);
+        speculative.mint(cuh, 4 ether);
+
+        vm.prank(cuh);
+        base.approve(address(this), 9 ether);
+
+        vm.prank(cuh);
+        speculative.approve(address(this), 4 ether);
+
+        vm.expectRevert(Pair.InvariantError.selector);
+        pair.mint(9 ether, 4 ether, 1 ether + 1, abi.encode(CallbackHelper.CallbackData({ key: key, payer: cuh })));
+    }
+
+    function testTooSmallScale() public {
+        base.mint(cuh, 9 ether);
+        speculative.mint(cuh, 4 ether);
+
+        vm.prank(cuh);
+        base.approve(address(this), 9 ether);
+
+        vm.prank(cuh);
+        speculative.approve(address(this), 4 ether);
+
+        vm.expectRevert(Pair.InvariantError.selector);
+        pair.mint(9 ether, 4 ether, 1 ether - 1, abi.encode(CallbackHelper.CallbackData({ key: key, payer: cuh })));
+    }
+
+    function testSpeculativeUpperBound2() public {
+        _pairMint(0 ether, 10 ether, 1 ether, cuh);
+    }
+
+    function testLargeScale() public {
+        _pairMint(10**27, 8 * 10**27, 10**27, cuh);
+    }
+
+    function testSmallScale() public {
+        _pairMint(1_000_000, 8_000_000, 1_000_000, cuh);
+    }
+
+    function testDivideToZero() public {
+        base.mint(cuh, 9 ether);
+        speculative.mint(cuh, 4 ether);
+
+        vm.prank(cuh);
+        base.approve(address(this), 9 ether);
+
+        vm.prank(cuh);
+        speculative.approve(address(this), 4 ether);
+
+        vm.expectRevert(Pair.InvariantError.selector);
+        pair.mint(
+            9 ether,
+            4 ether,
+            1 ether * 1 ether,
+            abi.encode(CallbackHelper.CallbackData({ key: key, payer: cuh }))
+        );
+    }
+
+    function testDivideByZero() public {
+        base.mint(cuh, 9 ether);
+        speculative.mint(cuh, 4 ether);
+
+        vm.prank(cuh);
+        base.approve(address(this), 9 ether);
+
+        vm.prank(cuh);
+        speculative.approve(address(this), 4 ether);
+
+        vm.expectRevert(Pair.InsufficientOutputError.selector);
+        pair.mint(9 ether, 4 ether, 0, abi.encode(CallbackHelper.CallbackData({ key: key, payer: cuh })));
+    }
+
     function testSpeculativeInvariantError() public {
         speculative.mint(cuh, 2 * upperBound + 1);
 
@@ -178,38 +251,111 @@ contract InvariantTest is TestHelper {
     //     );
     // }
 
-    // function testSwapUpperBound() public {
-    //     uint256 rB = 0 ether;
-    //     uint256 rS = 2 ether;
-    //     _pairMint(rB, rS, cuh);
+    function testSwapUpperBound() public {
+        uint256 rB = 0 ether;
+        uint256 rS = 2 ether;
+        _pairMint(rB, rS, 1 ether / 5, cuh);
 
-    //     uint256 amountSOut = 2 ether;
+        uint256 amountSOut = 2 ether;
 
-    //     uint256 a = (amountSOut * upperBound) / 1 ether;
-    //     uint256 b = (amountSOut**2) / 4 ether;
-    //     uint256 c = (amountSOut * rS) / 2 ether;
+        uint256 amountBIn = 5 ether;
 
-    //     uint256 amountBIn = a + b - c;
+        base.mint(cuh, amountBIn);
 
-    //     base.mint(cuh, amountBIn);
+        vm.prank(cuh);
+        base.approve(address(this), amountBIn);
 
-    //     vm.prank(cuh);
-    //     base.approve(address(this), amountBIn);
+        pair.swap(
+            cuh,
+            0,
+            amountSOut,
+            abi.encode(SwapCallbackData({ key: key, payer: cuh, amount0In: amountBIn, amount1In: 0 }))
+        );
 
-    //     pair.swap(
-    //         cuh,
-    //         0,
-    //         amountSOut,
-    //         abi.encode(SwapCallbackData({ key: key, payer: cuh, amount0In: amountBIn, amount1In: 0 }))
-    //     );
+        (uint256 balanceBase, uint256 balanceSpec) = pair.balances();
 
-    //     (uint256 balanceBase, uint256 balanceSpec) = pair.balances();
+        assertEq(balanceBase, amountBIn);
+        assertEq(balanceSpec, 0);
+    }
 
-    //     assertEq(balanceBase, amountBIn);
-    //     assertEq(balanceSpec, 0);
-    // }
-    // test precision with extremes
+    // TODO: test precision with extremes price bounds (BTC / SHIB)
     // test donations to pool
-    // test incorrect liquidity values
-    // test super large scale
+
+    function testBurnWithDonation() public {
+        _pairMint(9 ether, 4 ether, 1 ether, cuh);
+
+        base.mint(dennis, 9 ether);
+        speculative.mint(dennis, 4 ether);
+
+        vm.startPrank(dennis);
+        base.transfer(address(pair), 9 ether);
+        speculative.transfer(address(pair), 4 ether);
+        vm.stopPrank();
+
+        pair.burn(cuh);
+
+        assertEq(base.balanceOf(cuh), 18 ether);
+        assertEq(speculative.balanceOf(cuh), 8 ether);
+
+        assertEq(pair.totalSupply(), 0);
+        assertEq(pair.buffer(), 0);
+    }
+
+    function testBurnDoubleWithDonation() public {
+        _mintMaker(9 ether, 4 ether, 1 ether, 1, cuh);
+
+        base.mint(address(pair), 9 ether);
+        speculative.mint(address(pair), 4 ether);
+
+        _pairMint(9 ether, 4 ether, 1 ether, dennis);
+
+        pair.burn(dennis);
+
+        assertEq(base.balanceOf(dennis), 13.5 ether);
+        assertEq(speculative.balanceOf(dennis), 6 ether);
+
+        assertEq(pair.totalSupply(), 1 ether);
+        assertEq(pair.buffer(), 0);
+
+        _burnMaker(1 ether, 1, cuh);
+
+        assertEq(pair.buffer(), 1 ether);
+        assertEq(pair.totalSupply(), 1 ether);
+
+        pair.burn(cuh);
+
+        assertEq(pair.totalSupply(), 0);
+        assertEq(pair.buffer(), 0);
+
+        assertEq(base.balanceOf(cuh), 13.5 ether);
+        assertEq(speculative.balanceOf(cuh), 6 ether);
+    }
+
+    function testSwapWithDonations() public {
+        _pairMint(1 ether, 8 ether, 1 ether, cuh);
+
+        speculative.mint(address(pair), 8_000_000);
+
+        uint256 amountSOut = 0.00001 ether;
+
+        uint256 a = (amountSOut * upperBound) / 10**9;
+
+        uint256 b = (amountSOut**2) / 4 ether;
+
+        uint256 c = (amountSOut * 8 ether) / 2 ether;
+
+        uint256 amountBIn = a + b - c;
+
+        base.mint(cuh, amountBIn);
+
+        vm.prank(cuh);
+        base.approve(address(this), amountBIn);
+
+        pair.swap(
+            cuh,
+            0,
+            amountSOut + 8_000_000,
+            abi.encode(SwapCallbackData({ key: key, payer: cuh, amount0In: amountBIn, amount1In: 0 }))
+        );
+    }
 }
