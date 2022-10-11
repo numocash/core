@@ -16,7 +16,7 @@ abstract contract TestHelper is Test, CallbackHelper {
     MockERC20 public immutable base;
     MockERC20 public immutable speculative;
 
-    uint256 public immutable upperBound = 5 ether;
+    uint256 public immutable upperBound = 5 * 10**18;
 
     uint256 public immutable k = 10**36 + (5 * 10**36) - (1 ether**2) / 4;
 
@@ -62,10 +62,11 @@ abstract contract TestHelper is Test, CallbackHelper {
     function _mintMaker(
         uint256 amountBase,
         uint256 amountSpeculative,
+        uint256 liquidity,
         uint24 tick,
         address spender
     ) internal {
-        _pairMint(amountBase, amountSpeculative, spender);
+        _pairMint(amountBase, amountSpeculative, liquidity, spender);
 
         lendgine.mintMaker(spender, tick);
     }
@@ -73,6 +74,7 @@ abstract contract TestHelper is Test, CallbackHelper {
     function _pairMint(
         uint256 amountBase,
         uint256 amountSpeculative,
+        uint256 liquidity,
         address spender
     ) internal {
         base.mint(spender, amountBase);
@@ -86,7 +88,12 @@ abstract contract TestHelper is Test, CallbackHelper {
             base.approve(address(this), amountBase);
         }
 
-        pair.mint(amountBase, amountSpeculative, abi.encode(CallbackHelper.CallbackData({ key: key, payer: spender })));
+        pair.mint(
+            amountBase,
+            amountSpeculative,
+            liquidity,
+            abi.encode(CallbackHelper.CallbackData({ key: key, payer: spender }))
+        );
     }
 
     function _burnMaker(
