@@ -30,7 +30,7 @@ contract InvariantTest is TestHelper {
     }
 
     function testSpeculativeUpperBound() public {
-        _pairMint(0 ether, 2 * upperBound, 10**9, cuh);
+        _pairMint(0 ether, 2 * upperBound, 1 ether, cuh);
     }
 
     function testTooLargeScale() public {
@@ -113,7 +113,7 @@ contract InvariantTest is TestHelper {
         speculative.approve(address(this), 2 * upperBound + 1);
 
         vm.expectRevert(Pair.SpeculativeInvariantError.selector);
-        pair.mint(0, 2 * upperBound + 1, 10**9, abi.encode(CallbackHelper.CallbackData({ key: key, payer: cuh })));
+        pair.mint(0, 2 * upperBound + 1, 1 ether, abi.encode(CallbackHelper.CallbackData({ key: key, payer: cuh })));
     }
 
     function testBaseInvariantError() public {
@@ -193,7 +193,7 @@ contract InvariantTest is TestHelper {
 
         uint256 amountSOut = 0.00001 ether;
 
-        uint256 a = (amountSOut * upperBound) / 10**9;
+        uint256 a = (amountSOut * upperBound) / 10**18;
 
         uint256 b = (amountSOut**2) / 4 ether;
 
@@ -279,7 +279,6 @@ contract InvariantTest is TestHelper {
     }
 
     // TODO: test precision with extremes price bounds (BTC / SHIB)
-    // test donations to pool
 
     function testBurnWithDonation() public {
         _pairMint(9 ether, 4 ether, 1 ether, cuh);
@@ -334,11 +333,12 @@ contract InvariantTest is TestHelper {
     function testSwapWithDonations() public {
         _pairMint(1 ether, 8 ether, 1 ether, cuh);
 
+        base.mint(address(pair), 1_000_000);
         speculative.mint(address(pair), 8_000_000);
 
         uint256 amountSOut = 0.00001 ether;
 
-        uint256 a = (amountSOut * upperBound) / 10**9;
+        uint256 a = (amountSOut * upperBound) / 10**18;
 
         uint256 b = (amountSOut**2) / 4 ether;
 
@@ -355,7 +355,7 @@ contract InvariantTest is TestHelper {
             cuh,
             0,
             amountSOut + 8_000_000,
-            abi.encode(SwapCallbackData({ key: key, payer: cuh, amount0In: amountBIn, amount1In: 0 }))
+            abi.encode(SwapCallbackData({ key: key, payer: cuh, amount0In: amountBIn - 1_000_000, amount1In: 0 }))
         );
     }
 }
