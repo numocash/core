@@ -10,8 +10,6 @@ import { ISwapCallback } from "./interfaces/ISwapCallback.sol";
 import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
 import { ERC20 } from "solmate/tokens/ERC20.sol";
 
-import "forge-std/console2.sol";
-
 /// @notice A gas efficient and opinionated capped power invariant pair
 /// @author Kyle Scott (https://github.com/numoen/core/blob/master/src/Pair.sol)
 /// @author Modified from Uniswap (https://github.com/Uniswap/v2-core/blob/master/contracts/UniswapV2Pair.sol)
@@ -50,9 +48,6 @@ contract Pair {
     /*//////////////////////////////////////////////////////////////
                                IMMUTABLES
     //////////////////////////////////////////////////////////////*/
-
-    uint8 public constant BoundScale = 9;
-    uint8 public constant LiquidityScale = 9;
 
     address public immutable factory;
 
@@ -115,12 +110,6 @@ contract Pair {
         uint256 c = (scale1**2) / 4;
         uint256 d = upperBound**2;
 
-        // console2.log("a", a);
-        // console2.log("b", b);
-        // console2.log("c", c);
-        // console2.log("sum", a + b - c);
-        // console2.log("d", d);
-
         if (a > d) revert BaseInvariantError();
         if (scale1 > 2 * upperBound) revert SpeculativeInvariantError();
 
@@ -180,8 +169,8 @@ contract Pair {
 
         ISwapCallback(msg.sender).SwapCallback(amount0Out, amount1Out, data);
 
-        (uint256 balance0After, uint256 balance1After) = balances();
-        if (!verifyInvariant(balance0After, balance1After, totalSupply)) revert InvariantError();
+        (uint256 balance0, uint256 balance1) = balances();
+        if (!verifyInvariant(balance0, balance1, totalSupply)) revert InvariantError();
 
         emit Swap(msg.sender, amount0Out, amount1Out, to);
     }

@@ -209,6 +209,7 @@ contract Lendgine is ERC20 {
 
         // remove liquidity if we bumped someone out
         if (tick < currentTick) {
+            // TODO: update interestNumerator
             decreaseCurrentLiquidity(amountLP);
         }
 
@@ -254,15 +255,12 @@ contract Lendgine is ERC20 {
         }
 
         if (amountLP == 0) revert InsufficientOutputError();
+        if (amountLP > position.liquidity) revert InsufficientPositionError();
 
         // Remove position from the data structure
-        if (amountLP < position.liquidity) {
-            // if tick needs to advance to the next tick
-            if (currentTick == tick && currentLiquidity > position.liquidity - amountLP)
-                currentLiquidity = position.liquidity - amountLP;
-            // positions.get(msg.sender).update(-int256(amountLP));
-        } else if (amountLP > position.liquidity) {
-            revert InsufficientPositionError();
+        // if tick needs to advance to the next tick
+        if (currentTick == tick && currentLiquidity > position.liquidity - amountLP) {
+            currentLiquidity = position.liquidity - amountLP;
         }
 
         ticks.update(tick, -int256(amountLP));
@@ -270,6 +268,7 @@ contract Lendgine is ERC20 {
 
         // Replace if we removed utilized liquidity
         if (utilizedLP > 0) {
+            // TODO: update interestNumerator
             increaseCurrentLiquidity(utilizedLP);
         }
 
@@ -329,11 +328,11 @@ contract Lendgine is ERC20 {
     }
 
     function speculativeForLP(uint256 _lpAmount) public view returns (uint256) {
-        return (2 * _lpAmount * Pair(pair).upperBound()) / 10**36;
+        return (2 * _lpAmount * Pair(pair).upperBound()) / 10**18;
     }
 
     function lpForSpeculative(uint256 _speculativeAmount) public view returns (uint256) {
-        return (_speculativeAmount * 1 ether * 1 ether) / (2 * Pair(pair).upperBound());
+        return (_speculativeAmount * 1 ether) / (2 * Pair(pair).upperBound());
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -356,6 +355,7 @@ contract Lendgine is ERC20 {
                 interestNumeratorDelta += _currentTick * remainingCurrentLiquidity;
 
                 _currentTick = _currentTick + 1;
+                currentLiquidity = 0;
                 // TODO: error when max tick is reached
                 currentTickInfo = ticks[_currentTick];
 
@@ -411,7 +411,7 @@ contract Lendgine is ERC20 {
         uint256 dilutionLP = (interestNumerator * timeElapsed) / (1 days * 10_000);
         uint256 dilutionSpeculative = speculativeForLP(dilutionLP);
 
-        rewardPerINStored += (dilutionSpeculative * 1 ether * 1 ether) / interestNumerator;
+        rewardPerINStored += (dilutionSpeculative * 1 ether) / interestNumerator;
 
         _accrueTickInterest(currentTick);
 
@@ -444,6 +444,7 @@ contract Lendgine is ERC20 {
 
     /// @dev assume global interest accrual is up to date
     function _accrueMakerInterest(bytes32 id, uint24 tick) private {
+        // TODO: assert tick is matched with correct id
         Position.Info storage position = positions[id];
         Position.Info memory _position = position;
 
@@ -473,8 +474,7 @@ contract Lendgine is ERC20 {
     function newTokensOwed(Position.Info memory position, Tick.Info memory tickInfo) private pure returns (uint256) {
         uint256 liquidity = position.liquidity;
 
-        uint256 owed = (liquidity * (tickInfo.tokensOwedPerLiquidity - position.rewardPerLiquidityPaid)) /
-            (1 ether * 1 ether);
+        uint256 owed = (liquidity * (tickInfo.tokensOwedPerLiquidity - position.rewardPerLiquidityPaid)) / (1 ether);
         return owed;
     }
 }

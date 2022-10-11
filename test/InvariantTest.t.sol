@@ -278,8 +278,6 @@ contract InvariantTest is TestHelper {
         assertEq(balanceSpec, 0);
     }
 
-    // TODO: test precision with extremes price bounds (BTC / SHIB)
-
     function testBurnWithDonation() public {
         _pairMint(9 ether, 4 ether, 1 ether, cuh);
 
@@ -358,4 +356,101 @@ contract InvariantTest is TestHelper {
             abi.encode(SwapCallbackData({ key: key, payer: cuh, amount0In: amountBIn - 1_000_000, amount1In: 0 }))
         );
     }
+
+    // TODO: test precision with extremes price bounds (BTC / SHIB)
+
+    // How much in relative terms does a few lp positions cost
+    // How much liquidity can be added until an upper bound is reached
+    // concerns are the liquidity is so expensive that 1 wei is too much money for a regular person
+    // or that liquidity is so cheap that it starts to reach the max value
+
+    function testLPPriceLow() public {
+        uint256 price = 5 * 10**12;
+        uint256 r0 = price**2 / 1 ether;
+        uint256 r1 = 2 * (upperBound - price);
+        _pairMint(r0, r1, 1 ether, cuh);
+
+        uint256 value = r0 + (price * r1) / 1 ether;
+        console2.log("Max TVL of pool", value * 2**128);
+    }
+
+    function testLpPriceMax() public {
+        uint256 price = upperBound;
+        uint256 r0 = price**2 / 1 ether;
+        uint256 r1 = 2 * (upperBound - price);
+        _pairMint(r0, r1, 1 ether, cuh);
+
+        uint256 value = r0 + (price * r1) / 1 ether;
+        console2.log("price of LP ( Base * 10 ** 18)", value);
+    }
+
+    function testHighUpperBoundMax() public {
+        uint256 _upperBound = 10**30;
+
+        Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), _upperBound));
+
+        Pair _pair = Pair(_lendgine.pair());
+
+        uint256 price = _upperBound;
+        uint256 r0 = price**2 / 1 ether;
+
+        base.mint(cuh, r0);
+
+        vm.prank(cuh);
+        base.approve(address(this), r0);
+
+        _pair.mint(r0, 0, 1 ether, abi.encode(CallbackHelper.CallbackData({ key: key, payer: cuh })));
+
+        uint256 value = r0;
+        uint256 scale = 10**6;
+        console2.log("Dollars per LP token * 10**18", value / scale);
+    }
+
+    function testHighUpperBoundLow() public {
+        uint256 _upperBound = 10**30;
+
+        Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), _upperBound));
+
+        Pair _pair = Pair(_lendgine.pair());
+
+        uint256 price = 10**24;
+        uint256 r0 = price**2 / 1 ether;
+        uint256 r1 = 2 * (_upperBound - price);
+
+        base.mint(cuh, r0);
+        speculative.mint(cuh, r1);
+
+        vm.prank(cuh);
+        base.approve(address(this), r0);
+        vm.prank(cuh);
+        speculative.approve(address(this), r1);
+
+        _pair.mint(r0, r1, 1 ether, abi.encode(CallbackHelper.CallbackData({ key: key, payer: cuh })));
+
+        uint256 value = r0 + (price * r1) / 1 ether;
+        uint256 scale = 10**6;
+        console2.log("Max TVL of pool in $ * 10**18", (value * 2**128) / scale);
+    }
+
+    // function testLowUpperBoundMax() public {
+    //     uint256 _upperBound = 10**6;
+
+    //     Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), _upperBound));
+
+    //     Pair _pair = Pair(_lendgine.pair());
+
+    //     uint256 price = _upperBound;
+    //     uint256 r0 = 1;
+
+    //     base.mint(cuh, r0);
+
+    //     vm.prank(cuh);
+    //     base.approve(address(this), r0);
+
+    //     _pair.mint(r0, 0, 10**15, abi.encode(CallbackHelper.CallbackData({ key: key, payer: cuh })));
+
+    //     uint256 value = r0;
+    //     uint256 scale = 10**6;
+    //     console2.log("Dollars per LP token * 10**18", value / scale);
+    // }
 }
