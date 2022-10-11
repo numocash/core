@@ -51,6 +51,9 @@ contract Pair {
                                IMMUTABLES
     //////////////////////////////////////////////////////////////*/
 
+    uint8 public constant BoundScale = 9;
+    uint8 public constant LiquidityScale = 9;
+
     address public immutable factory;
 
     address public immutable lendgine;
@@ -104,17 +107,23 @@ contract Pair {
         uint256 r1,
         uint256 shares
     ) public view returns (bool) {
-        // TODO: describe scaling
-        uint256 a = (10**18 * r0) / shares;
-        uint256 b = (upperBound * r1 * 10**9) / shares;
-        uint256 c = (10**18 * r1**2) / (4 * shares**2);
-        uint256 d = upperBound**2;
+        uint256 scale0 = (r0 * 10**18) / shares;
+        uint256 scale1 = (r1 * 10**18) / shares;
+
+        uint256 a = scale0 * 10**18;
+        uint256 b = upperBound * scale1 * 10**9;
+        uint256 c = (scale1**2) / 4;
+        uint256 d = 10**18 * upperBound**2;
+
         // console2.log("a", a);
         // console2.log("b", b);
         // console2.log("c", c);
         // console2.log("sum", a + b - c);
         // console2.log("d", d);
-        //TODO: assertions on a,b,c,d
+
+        if (a > d) revert BaseInvariantError();
+        if (scale1 > 2 * upperBound * 10**9) revert SpeculativeInvariantError();
+
         return d == (a + b - c);
     }
 

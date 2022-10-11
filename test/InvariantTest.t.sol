@@ -10,6 +10,7 @@ import { LendgineAddress } from "../src/libraries/LendgineAddress.sol";
 
 import { Factory } from "../src/Factory.sol";
 import { Lendgine } from "../src/Lendgine.sol";
+import { Pair } from "../src/Pair.sol";
 import { Math } from "../src/libraries/Math.sol";
 
 contract InvariantTest is TestHelper {
@@ -24,12 +25,32 @@ contract InvariantTest is TestHelper {
         assertEq(pair.buffer(), 1 ether);
     }
 
-    function testMintUpperBound() public {
+    function testBaseUpperBound() public {
+        _pairMint(25 ether, 0, 1 ether, cuh);
+    }
+
+    function testSpeculativeUpperBound() public {
         _pairMint(0 ether, 2 * upperBound, 10**9, cuh);
     }
 
-    function testFailUpperBound() public {
-        _pairMint(0 ether, 2 * upperBound + 1, 1, cuh);
+    function testSpeculativeInvariantError() public {
+        speculative.mint(cuh, 2 * upperBound + 1);
+
+        vm.prank(cuh);
+        speculative.approve(address(this), 2 * upperBound + 1);
+
+        vm.expectRevert(Pair.SpeculativeInvariantError.selector);
+        pair.mint(0, 2 * upperBound + 1, 10**9, abi.encode(CallbackHelper.CallbackData({ key: key, payer: cuh })));
+    }
+
+    function testBaseInvariantError() public {
+        base.mint(cuh, 25 ether + 1);
+
+        vm.prank(cuh);
+        base.approve(address(this), 25 ether + 1);
+
+        vm.expectRevert(Pair.BaseInvariantError.selector);
+        pair.mint(25 ether + 1, 0, 1 ether, abi.encode(CallbackHelper.CallbackData({ key: key, payer: cuh })));
     }
 
     function testBurnAmount() public {
@@ -43,8 +64,6 @@ contract InvariantTest is TestHelper {
         assertEq(pair.totalSupply(), 0);
         assertEq(pair.buffer(), 0);
     }
-
-    // TODO: how to determine amount of lp
 
     function testDouble() public {
         _mintMaker(1 ether, 8 ether, 1 ether, 1, cuh);
@@ -159,48 +178,6 @@ contract InvariantTest is TestHelper {
     //     );
     // }
 
-    // function testPrice() public {
-    //     uint256 rB = 1_000_000 ether;
-    //     uint256 rS = 10 ether;
-    //     _pairMint(rB, rS, cuh);
-
-    //     uint256 amountSOut = .00000001 ether;
-
-    //     uint256 a = (amountSOut * upperBound) / 1 ether;
-    //     uint256 b = (amountSOut**2) / 4 ether;
-    //     uint256 c = (amountSOut * rS) / 2 ether;
-
-    //     uint256 amountBIn = a + b - c;
-
-    //     uint256 priceS = (amountBIn * 1 ether) / amountSOut;
-    //     console2.log(priceS, "usd per eth");
-
-    //     uint256 p = upperBound - rS / 2;
-
-    //     console2.log(p);
-    // }
-
-    // function testPrice2() public {
-    //     uint256 rB = 8 ether;
-    //     uint256 rS = 0.1 ether;
-    //     _pairMint(rB, rS, cuh);
-
-    //     uint256 amountSOut = .00000001 ether;
-
-    //     uint256 a = (amountSOut * upperBound) / 1 ether;
-    //     uint256 b = (amountSOut**2) / 4 ether;
-    //     uint256 c = (amountSOut * rS) / 2 ether;
-
-    //     uint256 amountBIn = a + b - c;
-
-    //     uint256 priceS = (amountBIn * 1 ether) / amountSOut;
-    //     console2.log(priceS, "usd per eth");
-
-    //     uint256 p = upperBound - rS / 2;
-
-    //     console2.log(p);
-    // }
-
     // function testSwapUpperBound() public {
     //     uint256 rB = 0 ether;
     //     uint256 rS = 2 ether;
@@ -233,4 +210,6 @@ contract InvariantTest is TestHelper {
     // }
     // test precision with extremes
     // test donations to pool
+    // test incorrect liquidity values
+    // test super large scale
 }
