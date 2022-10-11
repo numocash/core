@@ -46,7 +46,7 @@ contract MintMakerTest is TestHelper {
     }
 
     function testPositionsInit() public {
-        _mintMaker(1 ether, 1 ether, 1, cuh);
+        _mintMaker(1 ether, 1 ether, 1 ether, 1, cuh);
 
         bytes32 positionID = Position.getId(cuh, 1);
 

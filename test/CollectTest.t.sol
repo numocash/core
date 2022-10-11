@@ -17,7 +17,7 @@ contract CollectTest is TestHelper {
     function setUp() public {
         _setUp();
 
-        _mintMaker(1 ether, 1 ether, 1, cuh);
+        _mintMaker(1 ether, 1 ether, 1 ether, 1, cuh);
         _mint(1 ether, cuh);
 
         positionID = Position.getId(cuh, 1);

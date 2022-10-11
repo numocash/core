@@ -17,14 +17,14 @@ contract MintTest is TestHelper {
     function setUp() public {
         _setUp();
 
-        _mintMaker(1 ether, 1 ether, 1, cuh);
+        _mintMaker(4 ether, 1 ether, 1 ether, 1, cuh);
 
         positionID = Position.getId(cuh, 1);
     }
 
     function testMint() public {
         _mint(10 ether, cuh);
-        console2.log(pair.calcInvariant(10 ether, 0 ether));
+        // console2.log(pair.calcInvariant(10 ether, 0 ether));
 
         // Test lendgine token
         assertEq(lendgine.totalSupply(), 10**36);

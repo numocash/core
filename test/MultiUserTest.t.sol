@@ -17,8 +17,8 @@ contract MultiUserTest is TestHelper {
     }
 
     function testDoubleMintMakerSame() public {
-        _mintMaker(1 ether, 1 ether, 1, cuh);
-        _mintMaker(1 ether, 1 ether, 1, dennis);
+        _mintMaker(1 ether, 1 ether, 1 ether, 1, cuh);
+        _mintMaker(1 ether, 1 ether, 1 ether, 1, dennis);
 
         bytes32 cuhPositionID = Position.getId(cuh, 1);
         bytes32 dennisPositionID = Position.getId(dennis, 1);
@@ -51,8 +51,8 @@ contract MultiUserTest is TestHelper {
     }
 
     function testDoubleMintMakerDifferent() public {
-        _mintMaker(1 ether, 1 ether, 1, cuh);
-        _mintMaker(1 ether, 1 ether, 2, dennis);
+        _mintMaker(1 ether, 1 ether, 1 ether, 1, cuh);
+        _mintMaker(1 ether, 1 ether, 1 ether, 2, dennis);
 
         bytes32 cuhPositionID = Position.getId(cuh, 1);
         bytes32 dennisPositionID = Position.getId(dennis, 2);
@@ -91,8 +91,8 @@ contract MultiUserTest is TestHelper {
     }
 
     function testRemoveUnutilizedMaker() public {
-        _mintMaker(1 ether, 1 ether, 1, cuh);
-        _mintMaker(1 ether, 1 ether, 2, dennis);
+        _mintMaker(1 ether, 1 ether, 1 ether, 1, cuh);
+        _mintMaker(1 ether, 1 ether, 1 ether, 2, dennis);
         _burnMaker(k, 1, cuh);
 
         bytes32 cuhPositionID = Position.getId(cuh, 1);
@@ -133,8 +133,8 @@ contract MultiUserTest is TestHelper {
     }
 
     function testPartialRemoveUtilizedMaker() public {
-        _mintMaker(1 ether, 1 ether, 1, cuh);
-        _mintMaker(1 ether, 1 ether, 2, dennis);
+        _mintMaker(1 ether, 1 ether, 1 ether, 1, cuh);
+        _mintMaker(1 ether, 1 ether, 1 ether, 2, dennis);
         _mint(60 ether, address(this));
         _burnMaker(k / 2, 1, cuh);
 
@@ -177,8 +177,8 @@ contract MultiUserTest is TestHelper {
     }
 
     function testFullRemoveUtilizedMaker() public {
-        _mintMaker(1 ether, 1 ether, 1, cuh);
-        _mintMaker(1 ether, 1 ether, 2, dennis);
+        _mintMaker(1 ether, 1 ether, 1 ether, 1, cuh);
+        _mintMaker(1 ether, 1 ether, 1 ether, 2, dennis);
         _mint(10 ether, address(this));
         _burnMaker(k, 1, cuh);
 
@@ -219,8 +219,8 @@ contract MultiUserTest is TestHelper {
     }
 
     function testMintTwoTicksMaker() public {
-        _mintMaker(1 ether, 1 ether, 1, cuh);
-        _mintMaker(1 ether, 1 ether, 2, dennis);
+        _mintMaker(1 ether, 1 ether, 1 ether, 1, cuh);
+        _mintMaker(1 ether, 1 ether, 1 ether, 2, dennis);
         _mint(60 ether, address(this));
 
         bytes32 cuhPositionID = Position.getId(cuh, 1);
@@ -261,8 +261,8 @@ contract MultiUserTest is TestHelper {
     }
 
     function testMintFarTicksMaker() public {
-        _mintMaker(1 ether, 1 ether, 1, cuh);
-        _mintMaker(1 ether, 1 ether, 10, dennis);
+        _mintMaker(1 ether, 1 ether, 1 ether, 1, cuh);
+        _mintMaker(1 ether, 1 ether, 1 ether, 10, dennis);
         _mint(60 ether, address(this));
 
         bytes32 cuhPositionID = Position.getId(cuh, 1);
@@ -304,11 +304,11 @@ contract MultiUserTest is TestHelper {
     }
 
     function testMintUtilizedMaker() public {
-        _mintMaker(1 ether, 1 ether, 1, cuh);
-        _mintMaker(1 ether, 1 ether, 2, dennis);
+        _mintMaker(1 ether, 1 ether, 1 ether, 1, cuh);
+        _mintMaker(1 ether, 1 ether, 1 ether, 2, dennis);
         _mint(60 ether, address(this));
-        pair.burn(address(this), 1.25 ether, 1 ether);
-        _mintMaker(1 ether, 1 ether, 1, cuh);
+        pair.burn(address(this));
+        _mintMaker(1 ether, 1 ether, 1 ether, 1, cuh);
 
         bytes32 cuhPositionID = Position.getId(cuh, 1);
         bytes32 dennisPositionID = Position.getId(dennis, 2);
@@ -347,10 +347,10 @@ contract MultiUserTest is TestHelper {
     }
 
     function testMintNewUtilizedMaker() public {
-        _mintMaker(1 ether, 1 ether, 2, cuh);
+        _mintMaker(1 ether, 1 ether, 1 ether, 2, cuh);
         _mint(30 ether, address(this));
-        pair.burn(address(this), 0.5625 ether, 0.5 ether);
-        _mintMaker(1 ether, 1 ether, 1, dennis);
+        pair.burn(address(this));
+        _mintMaker(1 ether, 1 ether, 1 ether, 1, dennis);
 
         bytes32 cuhPositionID = Position.getId(cuh, 2);
         bytes32 dennisPositionID = Position.getId(dennis, 1);
@@ -389,8 +389,8 @@ contract MultiUserTest is TestHelper {
     }
 
     function testRemoveTwoTicks() public {
-        _mintMaker(1 ether, 1 ether, 1, cuh);
-        _mintMaker(1 ether, 1 ether, 2, dennis);
+        _mintMaker(1 ether, 1 ether, 1 ether, 1, cuh);
+        _mintMaker(1 ether, 1 ether, 1 ether, 2, dennis);
         _mint(60 ether, address(this));
         _burn(3 * 10**36, address(this));
 

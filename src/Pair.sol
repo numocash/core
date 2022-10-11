@@ -10,6 +10,8 @@ import { ISwapCallback } from "./interfaces/ISwapCallback.sol";
 import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
 import { ERC20 } from "solmate/tokens/ERC20.sol";
 
+import "forge-std/console2.sol";
+
 /// @notice A gas efficient and opinionated capped power invariant pair
 /// @author Kyle Scott (https://github.com/numoen/core/blob/master/src/Pair.sol)
 /// @author Modified from Uniswap (https://github.com/Uniswap/v2-core/blob/master/contracts/UniswapV2Pair.sol)
@@ -23,14 +25,7 @@ contract Pair {
 
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, uint256 liquidity, address indexed to);
 
-    event Swap(
-        address indexed sender,
-        uint256 amount0In,
-        uint256 amount1In,
-        uint256 amount0Out,
-        uint256 amount1Out,
-        address indexed to
-    );
+    event Swap(address indexed sender, uint256 amount0Out, uint256 amount1Out, address indexed to);
 
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
@@ -46,7 +41,11 @@ contract Pair {
 
     error LendgineError();
 
-    error MaxSpeculativeError();
+    error InvariantError();
+
+    error BaseInvariantError();
+
+    error SpeculativeInvariantError();
 
     /*//////////////////////////////////////////////////////////////
                                IMMUTABLES
@@ -100,19 +99,33 @@ contract Pair {
                               PAIR LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function calcInvariant(uint256 r0, uint256 r1) public view returns (uint256 invariant) {
-        // assert on r1 < g(p0)
-        if (r1 > 2 * upperBound) revert MaxSpeculativeError();
-        invariant = 10**18 * r0 + (upperBound * r1) - (r1**2) / 4;
+    function verifyInvariant(
+        uint256 r0,
+        uint256 r1,
+        uint256 shares
+    ) public view returns (bool) {
+        // TODO: describe scaling
+        uint256 a = (10**18 * r0) / shares;
+        uint256 b = (upperBound * r1 * 10**9) / shares;
+        uint256 c = (10**18 * r1**2) / (4 * shares**2);
+        uint256 d = upperBound**2;
+        // console2.log("a", a);
+        // console2.log("b", b);
+        // console2.log("c", c);
+        // console2.log("sum", a + b - c);
+        // console2.log("d", d);
+        //TODO: assertions on a,b,c,d
+        return d == (a + b - c);
     }
 
     function mint(
         uint256 amount0,
         uint256 amount1,
+        uint256 liquidity,
         bytes calldata data
-    ) external lock returns (uint256 liquidity) {
+    ) external lock {
         (uint256 balance0Before, uint256 balance1Before) = balances();
-        liquidity = calcInvariant(amount0, amount1);
+        if (!verifyInvariant(amount0, amount1, liquidity)) revert InvariantError();
 
         if (liquidity == 0) revert InsufficientOutputError();
         _mint(liquidity); // optimistic mint
@@ -127,21 +140,23 @@ contract Pair {
         emit Mint(msg.sender, amount0, amount1, liquidity);
     }
 
-    function burn(
-        address to,
-        uint256 amount0,
-        uint256 amount1
-    ) external lock returns (uint256 k) {
+    function burn(address to) external lock returns (uint256 amount0, uint256 amount1) {
+        (uint256 balance0, uint256 balance1) = balances();
+        uint256 liquidity = buffer;
+        uint256 _totalSupply = totalSupply;
+
+        // if (!verifyInvariant(balance0, balance1, _totalSupply)) revert InvariantError();
+
+        amount0 = (liquidity * balance0) / _totalSupply;
+        amount1 = (liquidity * balance1) / _totalSupply;
+
         if (amount0 == 0 && amount1 == 0) revert InsufficientOutputError();
-
-        k = calcInvariant(amount0, amount1);
-
-        _burn(k);
+        _burn(liquidity);
 
         SafeTransferLib.safeTransfer(ERC20(base), to, amount0);
         SafeTransferLib.safeTransfer(ERC20(speculative), to, amount1);
 
-        emit Burn(msg.sender, amount0, amount1, k, to);
+        emit Burn(msg.sender, amount0, amount1, liquidity, to);
     }
 
     function swap(
@@ -149,28 +164,22 @@ contract Pair {
         uint256 amount0Out,
         uint256 amount1Out,
         bytes calldata data
-    ) external lock returns (uint256 amount0In, uint256 amount1In) {
+    ) external lock {
         if (amount0Out == 0 && amount1Out == 0) revert InsufficientOutputError();
 
-        (uint256 balance0Before, uint256 balance1Before) = balances();
-        uint256 invariantBefore = calcInvariant(balance0Before, balance1Before);
+        uint256 _totalSupply = totalSupply;
+        // (uint256 balance0Before, uint256 balance1Before) = balances();
+        // if (!verifyInvariant(balance0Before, balance1Before, _totalSupply)) revert InvariantError();
 
         if (amount0Out > 0) SafeTransferLib.safeTransfer(ERC20(base), to, amount0Out);
         if (amount1Out > 0) SafeTransferLib.safeTransfer(ERC20(speculative), to, amount1Out);
 
         ISwapCallback(msg.sender).SwapCallback(amount0Out, amount1Out, data);
 
-        {
-            (uint256 balance0After, uint256 balance1After) = balances();
-            amount0In = balance0After + amount0Out - balance0Before;
-            amount1In = balance1After + amount1Out - balance1Before;
+        (uint256 balance0After, uint256 balance1After) = balances();
+        if (!verifyInvariant(balance0After, balance1After, _totalSupply)) revert InvariantError();
 
-            uint256 invariantAfter = calcInvariant(balance0After, balance1After);
-
-            if (invariantBefore > invariantAfter) revert InsufficientInputError();
-        }
-
-        emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to);
+        emit Swap(msg.sender, amount0Out, amount1Out, to);
     }
 
     /*//////////////////////////////////////////////////////////////
