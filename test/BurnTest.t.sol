@@ -21,7 +21,7 @@ contract BurnTest is TestHelper {
 
         _mint(10 ether, cuh);
 
-        positionID = Position.getId(cuh, 1);
+        positionID = Position.getID(cuh, 1);
     }
 
     function testBurnPartial() public {

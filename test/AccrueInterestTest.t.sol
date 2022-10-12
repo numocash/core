@@ -19,7 +19,7 @@ contract AccrueInterestTest is TestHelper {
 
         _mintMaker(1 ether, 8 ether, 1 ether, 1, cuh);
 
-        positionID = Position.getId(cuh, 1);
+        positionID = Position.getID(cuh, 1);
     }
 
     function testAccrueInterestBasic() public {

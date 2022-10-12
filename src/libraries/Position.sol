@@ -48,10 +48,10 @@ library Position {
         address owner,
         uint24 tick
     ) internal view returns (Position.Info storage position) {
-        position = self[getId(owner, tick)];
+        position = self[getID(owner, tick)];
     }
 
-    function getId(address owner, uint24 tick) internal pure returns (bytes32 id) {
+    function getID(address owner, uint24 tick) internal pure returns (bytes32 id) {
         id = keccak256(abi.encode(owner, tick));
     }
 }

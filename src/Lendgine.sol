@@ -39,7 +39,7 @@ contract Lendgine is ERC20 {
 
     event AccrueInterest();
 
-    event AccrueMakerInterest();
+    event AccruePositionInterest();
 
     event Collect(address indexed owner, address indexed to, uint256 amountBase);
 
@@ -195,13 +195,13 @@ contract Lendgine is ERC20 {
         if (liquidity == 0) revert InsufficientOutputError();
         if (tick == 0) revert InvalidTick();
 
-        bytes32 id = Position.getId(to, tick);
+        bytes32 id = Position.getID(to, tick);
 
         bool utilized = (cache.currentTick == tick && cache.currentLiquidity > 0) || (tick < cache.currentTick);
         if (utilized) {
             _accrueInterest(cache);
             if (tick != cache.currentTick) _accrueTickInterest(tick);
-            _accrueMakerInterest(id, tick);
+            _accruePositionInterest(id, tick);
         }
 
         ticks.update(tick, int256(liquidity));
@@ -229,7 +229,7 @@ contract Lendgine is ERC20 {
         if (liquidity == 0) revert InsufficientOutputError();
         if (tick == 0) revert InvalidTick();
 
-        bytes32 id = Position.getId(msg.sender, tick);
+        bytes32 id = Position.getID(msg.sender, tick);
         Position.Info memory positionInfo = positions.get(msg.sender, tick);
         Tick.Info memory tickInfo = ticks[tick];
 
@@ -238,7 +238,7 @@ contract Lendgine is ERC20 {
         if ((cache.currentTick == tick && cache.currentLiquidity > 0) || (tick < cache.currentTick)) {
             _accrueInterest(cache);
             if (tick != cache.currentTick) _accrueTickInterest(tick);
-            _accrueMakerInterest(id, tick);
+            _accruePositionInterest(id, tick);
         }
 
         uint256 utilizedLiquidity = 0;
@@ -288,16 +288,22 @@ contract Lendgine is ERC20 {
         if (tick != currentTick) _accrueTickInterest(tick);
     }
 
-    function accrueMakerInterest(bytes32 id, uint24 tick) external lock {
+    function accruePositionInterest(uint24 tick) external lock {
+        // TODO: assert id is in the tick
+        bytes32 id = Position.getID(msg.sender, tick);
         if (tick == 0) revert InvalidTick();
         StateCache memory cache = loadCache();
 
         _accrueInterest(cache);
         if (tick != currentTick) _accrueTickInterest(tick);
-        _accrueMakerInterest(id, tick);
+        _accruePositionInterest(id, tick);
     }
 
-    function collectMaker(address to, uint24 tick) external lock returns (uint256 collectedTokens) {
+    function collect(
+        address to,
+        uint24 tick,
+        uint256 amountS
+    ) external lock returns (uint256 collectedTokens) {
         if (tick == 0) revert InvalidTick();
 
         Position.Info storage position = positions.get(msg.sender, tick);
@@ -468,11 +474,11 @@ contract Lendgine is ERC20 {
                 _tickInfo.tokensOwedPerLiquidity +
                 ((tokensOwed * 1 ether) / _tickInfo.liquidity);
 
-        emit AccrueMakerInterest();
+        emit AccruePositionInterest();
     }
 
     /// @dev assume global interest accrual is up to date
-    function _accrueMakerInterest(bytes32 id, uint24 tick) private {
+    function _accruePositionInterest(bytes32 id, uint24 tick) private {
         // TODO: assert tick is matched with correct id
         Position.Info storage position = positions[id];
         Position.Info memory _position = position;
@@ -485,7 +491,7 @@ contract Lendgine is ERC20 {
         position.rewardPerLiquidityPaid = tickInfo.tokensOwedPerLiquidity;
         position.tokensOwed = _position.tokensOwed + tokensOwed;
 
-        emit AccrueMakerInterest();
+        emit AccruePositionInterest();
     }
 
     /// @dev Assumes reward per token stored is up to date
