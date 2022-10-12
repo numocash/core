@@ -75,7 +75,7 @@ contract BurnMakerTest is TestHelper {
 
     function testZeroBurn() public {
         vm.expectRevert(Lendgine.InsufficientOutputError.selector);
-        lendgine.burnMaker(1, 0 ether);
+        lendgine.withdraw(1, 0 ether);
     }
 
     // function testOverBurn() public {

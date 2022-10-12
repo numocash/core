@@ -27,13 +27,13 @@ contract Lendgine is ERC20 {
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
 
-    event Mint(address indexed sender, address indexed to, uint256 amountSpeculative, uint256 amountShares);
+    event Mint(address indexed sender, uint256 amountS, uint256 shares, uint256 liquidity, address indexed to);
 
-    event Burn(address indexed sender, address indexed to, uint256 amountShares, uint256 amountSpeculative);
+    event Burn(address indexed sender, uint256 amountS, uint256 shares, uint256 liquidity, address indexed to);
 
-    event MintMaker(address indexed sender, address indexed to, uint256 amountLP, uint24 tick); // add ticks to events
+    event Deposit(address indexed sender, address indexed to, uint256 amountLP, uint24 tick);
 
-    event BurnMaker(address indexed to, uint256 amountLP, uint24 tick);
+    event Withdraw(address indexed to, uint256 amountLP, uint24 tick);
 
     event AccrueInterest();
 
@@ -117,74 +117,64 @@ contract Lendgine is ERC20 {
     }
 
     /*//////////////////////////////////////////////////////////////
-                            LENDGINE LOGIC
+                            MINT/BURN LOGIC
     //////////////////////////////////////////////////////////////*/
 
     function mint(
-        address recipient,
-        uint256 amountSpeculative,
+        address to,
+        uint256 amountS,
         bytes calldata data
     ) external lock returns (uint256) {
         _accrueInterest();
 
         if (currentTick == 0) revert CompleteUtilizationError();
 
-        // amount of LP to be borrowed
-        uint256 lpAmount = lpForSpeculative(amountSpeculative);
+        uint256 liquidity = convertAssetToLiquidity(amountS);
+        uint256 shares = convertLiquidityToShare(liquidity);
 
-        // amount of shares to award the recipient
-        uint256 totalLPAmount = totalLiquidityBorrowed;
-        uint256 _totalSupply = totalSupply;
-        uint256 amountShares = _totalSupply != 0 ? (lpAmount * _totalSupply) / totalLPAmount : lpAmount;
+        if (shares == 0) revert InsufficientOutputError();
 
-        if (amountShares == 0) revert InsufficientOutputError();
-
-        // gather speculative tokens from makers
-        uint256 interestNumeratorDelta = increaseCurrentLiquidity(lpAmount);
+        uint256 interestNumeratorDelta = increaseCurrentLiquidity(liquidity);
         interestNumerator += interestNumeratorDelta;
-        totalLiquidityBorrowed += lpAmount;
+        totalLiquidityBorrowed += liquidity;
 
-        _mint(recipient, amountShares); // optimistically mint
-
-        Pair(pair).addBuffer(lpAmount);
+        _mint(to, shares); // optimistically mint
+        Pair(pair).addBuffer(liquidity);
 
         uint256 balanceBefore = balanceSpeculative();
-        IMintCallback(msg.sender).MintCallback(amountSpeculative, data);
+        IMintCallback(msg.sender).MintCallback(amountS, data);
         uint256 balanceAfter = balanceSpeculative();
+        if (balanceAfter < balanceBefore + amountS) revert InsufficientInputError();
 
-        if (balanceAfter < balanceBefore + amountSpeculative) revert InsufficientInputError();
-
-        emit Mint(msg.sender, recipient, amountSpeculative, amountShares);
-
-        return amountShares;
+        emit Mint(msg.sender, amountS, shares, liquidity, to);
+        return shares;
     }
 
-    function burn(address recipient) external lock {
+    function burn(address to) external lock {
         _accrueInterest();
 
-        uint256 amountShares = balanceOf[address(this)];
+        uint256 shares = balanceOf[address(this)];
+        uint256 liquidity = convertShareToLiquidity(shares);
+        uint256 amountS = convertLiquidityToAsset(liquidity);
 
-        uint256 amountLP = (amountShares * totalLiquidityBorrowed) / totalSupply;
+        if (liquidity == 0) revert InsufficientOutputError();
 
-        if (amountLP == 0) revert InsufficientOutputError();
-
-        uint256 amountSpeculative = speculativeForLP(amountLP);
-
-        uint256 interestNumeratorDelta = decreaseCurrentLiquidity(amountLP);
-
+        uint256 interestNumeratorDelta = decreaseCurrentLiquidity(liquidity);
         interestNumerator -= interestNumeratorDelta;
-        totalLiquidityBorrowed -= amountLP;
+        totalLiquidityBorrowed -= liquidity;
 
-        _burn(address(this), amountShares);
+        _burn(address(this), shares);
+        Pair(pair).removeBuffer(liquidity);
+        SafeTransferLib.safeTransfer(ERC20(Pair(pair).speculative()), to, amountS);
 
-        SafeTransferLib.safeTransfer(ERC20(Pair(pair).speculative()), recipient, amountSpeculative);
-
-        Pair(pair).removeBuffer(amountLP);
-
-        emit Burn(msg.sender, recipient, amountShares, amountSpeculative);
+        emit Burn(msg.sender, amountS, shares, liquidity, to);
     }
 
-    function mintMaker(address recipient, uint24 tick) external lock {
+    /*//////////////////////////////////////////////////////////////
+                        DEPOSIT/WITHDRAWAL LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function deposit(address recipient, uint24 tick) external lock {
         uint256 amountLP = Pair(pair).buffer();
 
         Position.Info storage position = positions.get(recipient, tick);
@@ -219,10 +209,10 @@ contract Lendgine is ERC20 {
 
         Pair(pair).removeBuffer(amountLP);
 
-        emit MintMaker(msg.sender, recipient, amountLP, tick);
+        emit Deposit(msg.sender, recipient, amountLP, tick);
     }
 
-    function burnMaker(uint24 tick, uint256 amountLP) external lock {
+    function withdraw(uint24 tick, uint256 amountLP) external lock {
         if (tick == 0) revert InvalidTick();
 
         Position.Info storage position = positions.get(msg.sender, tick);
@@ -254,7 +244,6 @@ contract Lendgine is ERC20 {
             utilizedLP = amountLP;
         }
 
-        if (amountLP == 0) revert InsufficientOutputError();
         if (amountLP > position.liquidity) revert InsufficientPositionError();
 
         // Remove position from the data structure
@@ -274,8 +263,12 @@ contract Lendgine is ERC20 {
 
         Pair(pair).addBuffer(amountLP);
 
-        emit BurnMaker(msg.sender, amountLP, tick);
+        emit Withdraw(msg.sender, amountLP, tick);
     }
+
+    /*//////////////////////////////////////////////////////////////
+                            INTEREST LOGIC
+    //////////////////////////////////////////////////////////////*/
 
     function accrueInterest() external lock {
         _accrueInterest();
@@ -312,6 +305,27 @@ contract Lendgine is ERC20 {
     }
 
     /*//////////////////////////////////////////////////////////////
+                            ACCOUNTING LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function convertLiquidityToShare(uint256 liquidity) public view returns (uint256) {
+        uint256 _totalLiquidityBorrowed = totalLiquidityBorrowed;
+        return _totalLiquidityBorrowed == 0 ? liquidity : (liquidity * totalSupply) / _totalLiquidityBorrowed;
+    }
+
+    function convertShareToLiquidity(uint256 shares) public view returns (uint256) {
+        return (totalLiquidityBorrowed * shares) / totalSupply;
+    }
+
+    function convertAssetToLiquidity(uint256 assets) public view returns (uint256) {
+        return (assets * 10**18) / (2 * Pair(pair).upperBound());
+    }
+
+    function convertLiquidityToAsset(uint256 liquidity) public view returns (uint256) {
+        return (2 * liquidity * Pair(pair).upperBound()) / 10**18;
+    }
+
+    /*//////////////////////////////////////////////////////////////
                                 VIEW
     //////////////////////////////////////////////////////////////*/
 
@@ -325,14 +339,6 @@ contract Lendgine is ERC20 {
         if (!success || data.length < 32) revert BalanceReturnError();
 
         return abi.decode(data, (uint256));
-    }
-
-    function speculativeForLP(uint256 _lpAmount) public view returns (uint256) {
-        return (2 * _lpAmount * Pair(pair).upperBound()) / 10**18;
-    }
-
-    function lpForSpeculative(uint256 _speculativeAmount) public view returns (uint256) {
-        return (_speculativeAmount * 1 ether) / (2 * Pair(pair).upperBound());
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -409,7 +415,7 @@ contract Lendgine is ERC20 {
 
         // calculate how much must be removed
         uint256 dilutionLP = (interestNumerator * timeElapsed) / (1 days * 10_000);
-        uint256 dilutionSpeculative = speculativeForLP(dilutionLP);
+        uint256 dilutionSpeculative = convertLiquidityToAsset(dilutionLP);
 
         rewardPerINStored += (dilutionSpeculative * 1 ether) / interestNumerator;
 

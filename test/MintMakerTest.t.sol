@@ -74,6 +74,6 @@ contract MintMakerTest is TestHelper {
 
     function testZeroMint() public {
         vm.expectRevert(Lendgine.InsufficientOutputError.selector);
-        lendgine.mintMaker(cuh, 1);
+        lendgine.deposit(cuh, 1);
     }
 }
