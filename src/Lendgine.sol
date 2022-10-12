@@ -186,7 +186,7 @@ contract Lendgine is ERC20 {
                         DEPOSIT/WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function deposit(address recipient, uint24 tick) external lock {
+    function deposit(address to, uint24 tick) external lock {
         StateCache memory cache = loadCache();
 
         uint256 liquidity = Pair(pair).buffer();
@@ -194,7 +194,7 @@ contract Lendgine is ERC20 {
         if (liquidity == 0) revert InsufficientOutputError();
         if (tick == 0) revert InvalidTick();
 
-        bytes32 id = Position.getId(recipient, tick);
+        bytes32 id = Position.getId(to, tick);
 
         bool utilized = (cache.currentTick == tick && cache.currentLiquidity > 0) || (tick < cache.currentTick);
         if (utilized) {
@@ -209,7 +209,9 @@ contract Lendgine is ERC20 {
         if (tick < cache.currentTick) {
             cache.interestNumerator += liquidity * tick;
             cache.totalLiquidityBorrowed += liquidity;
+
             decreaseCurrentLiquidity(liquidity, cache);
+
             interestNumerator = cache.interestNumerator;
             currentLiquidity = cache.currentLiquidity;
             currentTick = cache.currentTick;
@@ -218,7 +220,7 @@ contract Lendgine is ERC20 {
         }
 
         Pair(pair).removeBuffer(liquidity);
-        emit Deposit(msg.sender, recipient, liquidity, tick);
+        emit Deposit(msg.sender, to, liquidity, tick);
     }
 
     function withdraw(uint24 tick, uint256 liquidity) external lock {
@@ -296,20 +298,18 @@ contract Lendgine is ERC20 {
         _accrueMakerInterest(id, tick);
     }
 
-    function collectMaker(address recipient, uint24 tick) external lock returns (uint256 collectedTokens) {
+    function collectMaker(address to, uint24 tick) external lock returns (uint256 collectedTokens) {
         if (tick == 0) revert InvalidTick();
 
         Position.Info storage position = positions.get(msg.sender, tick);
 
         collectedTokens = position.tokensOwed;
-
         if (collectedTokens == 0) revert InsufficientOutputError();
 
         position.tokensOwed = 0;
+        SafeTransferLib.safeTransfer(ERC20(Pair(pair).speculative()), to, collectedTokens);
 
-        SafeTransferLib.safeTransfer(ERC20(Pair(pair).speculative()), recipient, collectedTokens);
-
-        emit Collect(msg.sender, recipient, collectedTokens);
+        emit Collect(msg.sender, to, collectedTokens);
     }
 
     /*//////////////////////////////////////////////////////////////
