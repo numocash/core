@@ -150,7 +150,7 @@ contract Lendgine is ERC20 {
         return shares;
     }
 
-    function burn(address to) external lock {
+    function burn(address to) external lock returns (uint256) {
         _accrueInterest();
 
         uint256 shares = balanceOf[address(this)];
@@ -168,6 +168,7 @@ contract Lendgine is ERC20 {
         SafeTransferLib.safeTransfer(ERC20(Pair(pair).speculative()), to, amountS);
 
         emit Burn(msg.sender, amountS, shares, liquidity, to);
+        return amountS;
     }
 
     /*//////////////////////////////////////////////////////////////
