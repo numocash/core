@@ -39,6 +39,8 @@ contract Lendgine is ERC20 {
 
     event AccrueInterest();
 
+    event AccrueTickInterest();
+
     event AccruePositionInterest();
 
     event Collect(address indexed owner, address indexed to, uint256 amountBase);
@@ -289,9 +291,9 @@ contract Lendgine is ERC20 {
     }
 
     function accruePositionInterest(uint24 tick) external lock {
-        // TODO: assert id is in the tick
-        bytes32 id = Position.getID(msg.sender, tick);
         if (tick == 0) revert InvalidTick();
+
+        bytes32 id = Position.getID(msg.sender, tick);
         StateCache memory cache = loadCache();
 
         _accrueInterest(cache);
@@ -302,19 +304,20 @@ contract Lendgine is ERC20 {
     function collect(
         address to,
         uint24 tick,
-        uint256 amountS
-    ) external lock returns (uint256 collectedTokens) {
+        uint256 amountSRequested
+    ) external lock returns (uint256 amountS) {
         if (tick == 0) revert InvalidTick();
 
         Position.Info storage position = positions.get(msg.sender, tick);
 
-        collectedTokens = position.tokensOwed;
-        if (collectedTokens == 0) revert InsufficientOutputError();
+        amountS = amountSRequested > position.tokensOwed ? position.tokensOwed : amountSRequested;
 
-        position.tokensOwed = 0;
-        SafeTransferLib.safeTransfer(ERC20(Pair(pair).speculative()), to, collectedTokens);
+        if (amountS > 0) {
+            position.tokensOwed -= amountS;
+            SafeTransferLib.safeTransfer(ERC20(Pair(pair).speculative()), to, amountS);
+        }
 
-        emit Collect(msg.sender, to, collectedTokens);
+        emit Collect(msg.sender, to, amountS);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -339,7 +342,7 @@ contract Lendgine is ERC20 {
     }
 
     /*//////////////////////////////////////////////////////////////
-                                VIEW
+                             STATE CACHE
     //////////////////////////////////////////////////////////////*/
 
     struct StateCache {
@@ -360,7 +363,7 @@ contract Lendgine is ERC20 {
     }
 
     /*//////////////////////////////////////////////////////////////
-                                VIEW
+                                 VIEW
     //////////////////////////////////////////////////////////////*/
 
     function balanceSpeculative() public view returns (uint256) {
@@ -376,10 +379,9 @@ contract Lendgine is ERC20 {
     }
 
     /*//////////////////////////////////////////////////////////////
-                            INTERNAL LOGIC
+                         INTERNAL LIQUIDITY LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev Current position is assumed to be valid
     function increaseCurrentLiquidity(uint256 liquidity, StateCache memory cache) private view {
         Tick.Info memory currentTickInfo = ticks[cache.currentTick];
 
@@ -431,6 +433,10 @@ contract Lendgine is ERC20 {
         cache.currentLiquidity = remainingCurrentLiquidity - remainingLP;
     }
 
+    /*//////////////////////////////////////////////////////////////
+                         INTERNAL INTEREST LOGIC
+    //////////////////////////////////////////////////////////////*/
+
     function _accrueInterest(StateCache memory cache) private {
         if (totalSupply == 0) {
             lastUpdate = uint40(block.timestamp);
@@ -449,12 +455,11 @@ contract Lendgine is ERC20 {
         _accrueTickInterest(currentTick);
 
         decreaseCurrentLiquidity(dilutionLP, cache);
+
         totalLiquidityBorrowed = cache.totalLiquidityBorrowed - dilutionLP;
         interestNumerator = cache.interestNumerator;
         currentLiquidity = cache.currentLiquidity;
         currentTick = cache.currentTick;
-
-        // TODO: dilution > baseReserves;
         lastUpdate = uint40(block.timestamp);
 
         emit AccrueInterest();
@@ -474,12 +479,11 @@ contract Lendgine is ERC20 {
                 _tickInfo.tokensOwedPerLiquidity +
                 ((tokensOwed * 1 ether) / _tickInfo.liquidity);
 
-        emit AccruePositionInterest();
+        emit AccrueTickInterest();
     }
 
     /// @dev assume global interest accrual is up to date
     function _accruePositionInterest(bytes32 id, uint24 tick) private {
-        // TODO: assert tick is matched with correct id
         Position.Info storage position = positions[id];
         Position.Info memory _position = position;
 
@@ -497,19 +501,19 @@ contract Lendgine is ERC20 {
     /// @dev Assumes reward per token stored is up to date
     function newTokensOwed(Tick.Info memory tickInfo, uint24 tick) private view returns (uint256) {
         if (tick > currentTick) return 0;
+
         uint256 liquidity = tickInfo.liquidity;
         if (currentTick == tick) {
             liquidity = currentLiquidity;
         }
-        uint256 owed = (liquidity * tick * (rewardPerINStored - tickInfo.rewardPerINPaid)) / 1 ether;
-        return owed;
+
+        return (liquidity * tick * (rewardPerINStored - tickInfo.rewardPerINPaid)) / 1 ether;
     }
 
     /// @dev Assumes reward per token stored is up to date
     function newTokensOwed(Position.Info memory position, Tick.Info memory tickInfo) private pure returns (uint256) {
         uint256 liquidity = position.liquidity;
 
-        uint256 owed = (liquidity * (tickInfo.tokensOwedPerLiquidity - position.rewardPerLiquidityPaid)) / (1 ether);
-        return owed;
+        return (liquidity * (tickInfo.tokensOwedPerLiquidity - position.rewardPerLiquidityPaid)) / (1 ether);
     }
 }

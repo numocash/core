@@ -23,11 +23,6 @@ contract CollectTest is TestHelper {
         positionID = Position.getID(cuh, 1);
     }
 
-    function testZeroCollect() public {
-        vm.expectRevert(Lendgine.InsufficientOutputError.selector);
-        lendgine.collect(cuh, 1, 0);
-    }
-
     function testCollect() public {
         vm.warp(1 days + 1);
 
