@@ -33,33 +33,33 @@ contract InvariantTest is TestHelper {
         _pairMint(0 ether, 2 * upperBound, 1 ether, cuh);
     }
 
-    function testTooLargeScale() public {
-        base.mint(cuh, 9 ether);
-        speculative.mint(cuh, 4 ether);
+    // function testTooLargeScale() public {
+    //     base.mint(cuh, 9 ether);
+    //     speculative.mint(cuh, 4 ether);
 
-        vm.prank(cuh);
-        base.approve(address(this), 9 ether);
+    //     vm.prank(cuh);
+    //     base.approve(address(this), 9 ether);
 
-        vm.prank(cuh);
-        speculative.approve(address(this), 4 ether);
+    //     vm.prank(cuh);
+    //     speculative.approve(address(this), 4 ether);
 
-        vm.expectRevert(Pair.InvariantError.selector);
-        pair.mint(9 ether, 4 ether, 1 ether + 1, abi.encode(CallbackHelper.CallbackData({ key: key, payer: cuh })));
-    }
+    //     vm.expectRevert(Pair.InvariantError.selector);
+    //     pair.mint(9 ether, 4 ether, 1 ether + 1, abi.encode(CallbackHelper.CallbackData({ key: key, payer: cuh })));
+    // }
 
-    function testTooSmallScale() public {
-        base.mint(cuh, 9 ether);
-        speculative.mint(cuh, 4 ether);
+    // function testTooSmallScale() public {
+    //     base.mint(cuh, 9 ether);
+    //     speculative.mint(cuh, 4 ether);
 
-        vm.prank(cuh);
-        base.approve(address(this), 9 ether);
+    //     vm.prank(cuh);
+    //     base.approve(address(this), 9 ether);
 
-        vm.prank(cuh);
-        speculative.approve(address(this), 4 ether);
+    //     vm.prank(cuh);
+    //     speculative.approve(address(this), 4 ether);
 
-        vm.expectRevert(Pair.InvariantError.selector);
-        pair.mint(9 ether, 4 ether, 1 ether - 1, abi.encode(CallbackHelper.CallbackData({ key: key, payer: cuh })));
-    }
+    //     vm.expectRevert(Pair.InvariantError.selector);
+    //     pair.mint(9 ether, 4 ether, 1 ether - 1, abi.encode(CallbackHelper.CallbackData({ key: key, payer: cuh })));
+    // }
 
     function testSpeculativeUpperBound2() public {
         _pairMint(0 ether, 10 ether, 1 ether, cuh);
@@ -73,58 +73,58 @@ contract InvariantTest is TestHelper {
         _pairMint(1_000_000, 8_000_000, 1_000_000, cuh);
     }
 
-    function testDivideToZero() public {
-        base.mint(cuh, 9 ether);
-        speculative.mint(cuh, 4 ether);
+    // function testDivideToZero() public {
+    //     base.mint(cuh, 9 ether);
+    //     speculative.mint(cuh, 4 ether);
 
-        vm.prank(cuh);
-        base.approve(address(this), 9 ether);
+    //     vm.prank(cuh);
+    //     base.approve(address(this), 9 ether);
 
-        vm.prank(cuh);
-        speculative.approve(address(this), 4 ether);
+    //     vm.prank(cuh);
+    //     speculative.approve(address(this), 4 ether);
 
-        vm.expectRevert(Pair.InvariantError.selector);
-        pair.mint(
-            9 ether,
-            4 ether,
-            1 ether * 1 ether,
-            abi.encode(CallbackHelper.CallbackData({ key: key, payer: cuh }))
-        );
-    }
+    //     vm.expectRevert(Pair.InvariantError.selector);
+    //     pair.mint(
+    //         9 ether,
+    //         4 ether,
+    //         1 ether * 1 ether,
+    //         abi.encode(CallbackHelper.CallbackData({ key: key, payer: cuh }))
+    //     );
+    // }
 
-    function testDivideByZero() public {
-        base.mint(cuh, 9 ether);
-        speculative.mint(cuh, 4 ether);
+    // function testDivideByZero() public {
+    //     base.mint(cuh, 9 ether);
+    //     speculative.mint(cuh, 4 ether);
 
-        vm.prank(cuh);
-        base.approve(address(this), 9 ether);
+    //     vm.prank(cuh);
+    //     base.approve(address(this), 9 ether);
 
-        vm.prank(cuh);
-        speculative.approve(address(this), 4 ether);
+    //     vm.prank(cuh);
+    //     speculative.approve(address(this), 4 ether);
 
-        vm.expectRevert(Pair.InsufficientOutputError.selector);
-        pair.mint(9 ether, 4 ether, 0, abi.encode(CallbackHelper.CallbackData({ key: key, payer: cuh })));
-    }
+    //     vm.expectRevert(Pair.InsufficientOutputError.selector);
+    //     pair.mint(9 ether, 4 ether, 0, abi.encode(CallbackHelper.CallbackData({ key: key, payer: cuh })));
+    // }
 
-    function testSpeculativeInvariantError() public {
-        speculative.mint(cuh, 2 * upperBound + 1);
+    // function testSpeculativeInvariantError() public {
+    //     speculative.mint(cuh, 2 * upperBound + 1);
 
-        vm.prank(cuh);
-        speculative.approve(address(this), 2 * upperBound + 1);
+    //     vm.prank(cuh);
+    //     speculative.approve(address(this), 2 * upperBound + 1);
 
-        vm.expectRevert(Pair.SpeculativeInvariantError.selector);
-        pair.mint(0, 2 * upperBound + 1, 1 ether, abi.encode(CallbackHelper.CallbackData({ key: key, payer: cuh })));
-    }
+    //     vm.expectRevert(Pair.SpeculativeInvariantError.selector);
+    //     pair.mint(0, 2 * upperBound + 1, 1 ether, abi.encode(CallbackHelper.CallbackData({ key: key, payer: cuh })));
+    // }
 
-    function testBaseInvariantError() public {
-        base.mint(cuh, 25 ether + 1);
+    // function testBaseInvariantError() public {
+    //     base.mint(cuh, 25 ether + 1);
 
-        vm.prank(cuh);
-        base.approve(address(this), 25 ether + 1);
+    //     vm.prank(cuh);
+    //     base.approve(address(this), 25 ether + 1);
 
-        vm.expectRevert(Pair.BaseInvariantError.selector);
-        pair.mint(25 ether + 1, 0, 1 ether, abi.encode(CallbackHelper.CallbackData({ key: key, payer: cuh })));
-    }
+    //     vm.expectRevert(Pair.BaseInvariantError.selector);
+    //     pair.mint(25 ether + 1, 0, 1 ether, abi.encode(CallbackHelper.CallbackData({ key: key, payer: cuh })));
+    // }
 
     function testBurnAmount() public {
         _pairMint(9 ether, 4 ether, 1 ether, cuh);
@@ -167,25 +167,6 @@ contract InvariantTest is TestHelper {
         assertEq(speculative.balanceOf(cuh), 8 ether);
     }
 
-    struct SwapCallbackData {
-        LendgineAddress.LendgineKey key;
-        address payer;
-        uint256 amount0In;
-        uint256 amount1In;
-    }
-
-    function SwapCallback(
-        uint256,
-        uint256,
-        bytes calldata data
-    ) external {
-        SwapCallbackData memory decoded = abi.decode(data, (SwapCallbackData));
-        // CallbackValidation.verifyCallback(factory, decoded.poolKey);
-
-        if (decoded.amount0In > 0) pay(ERC20(decoded.key.base), decoded.payer, msg.sender, decoded.amount0In);
-        if (decoded.amount1In > 0) pay(ERC20(decoded.key.speculative), decoded.payer, msg.sender, decoded.amount1In);
-    }
-
     function testSwapBForS1() public {
         uint256 rB = 1 ether;
         uint256 rS = 8 ether;
@@ -204,17 +185,12 @@ contract InvariantTest is TestHelper {
         base.mint(cuh, amountBIn);
 
         vm.prank(cuh);
-        base.approve(address(this), amountBIn);
+        base.transfer(address(pair), amountBIn);
 
         console2.log("quote price", 1 ether);
         console2.log("trade price", (amountBIn * 1 ether) / amountSOut);
 
-        pair.swap(
-            cuh,
-            0,
-            amountSOut,
-            abi.encode(SwapCallbackData({ key: key, payer: cuh, amount0In: amountBIn, amount1In: 0 }))
-        );
+        pair.swap(cuh, 0, amountSOut);
     }
 
     // function testSwapBForS2() public {
@@ -263,14 +239,9 @@ contract InvariantTest is TestHelper {
         base.mint(cuh, amountBIn);
 
         vm.prank(cuh);
-        base.approve(address(this), amountBIn);
+        base.transfer(address(pair), amountBIn);
 
-        pair.swap(
-            cuh,
-            0,
-            amountSOut,
-            abi.encode(SwapCallbackData({ key: key, payer: cuh, amount0In: amountBIn, amount1In: 0 }))
-        );
+        pair.swap(cuh, 0, amountSOut);
 
         (uint256 balanceBase, uint256 balanceSpec) = pair.balances();
 
@@ -298,18 +269,18 @@ contract InvariantTest is TestHelper {
         assertEq(pair.buffer(), 0);
     }
 
-    function testBurnDoubleWithDonation() public {
+    function testMintWithDonation() public {
         _mintMaker(9 ether, 4 ether, 1 ether, 1, cuh);
 
         base.mint(address(pair), 9 ether);
         speculative.mint(address(pair), 4 ether);
 
-        _pairMint(9 ether, 4 ether, 1 ether, dennis);
+        pair.mint(1 ether);
 
         pair.burn(dennis);
 
-        assertEq(base.balanceOf(dennis), 13.5 ether);
-        assertEq(speculative.balanceOf(dennis), 6 ether);
+        assertEq(base.balanceOf(dennis), 9 ether);
+        assertEq(speculative.balanceOf(dennis), 4 ether);
 
         assertEq(pair.totalSupply(), 1 ether);
         assertEq(pair.buffer(), 0);
@@ -324,8 +295,8 @@ contract InvariantTest is TestHelper {
         assertEq(pair.totalSupply(), 0);
         assertEq(pair.buffer(), 0);
 
-        assertEq(base.balanceOf(cuh), 13.5 ether);
-        assertEq(speculative.balanceOf(cuh), 6 ether);
+        assertEq(base.balanceOf(cuh), 9 ether);
+        assertEq(speculative.balanceOf(cuh), 4 ether);
     }
 
     function testSwapWithDonations() public {
@@ -344,17 +315,12 @@ contract InvariantTest is TestHelper {
 
         uint256 amountBIn = a + b - c;
 
-        base.mint(cuh, amountBIn);
+        base.mint(cuh, amountBIn - 1_000_000);
 
         vm.prank(cuh);
-        base.approve(address(this), amountBIn);
+        base.transfer(address(pair), amountBIn - 1_000_000);
 
-        pair.swap(
-            cuh,
-            0,
-            amountSOut + 8_000_000,
-            abi.encode(SwapCallbackData({ key: key, payer: cuh, amount0In: amountBIn - 1_000_000, amount1In: 0 }))
-        );
+        pair.swap(cuh, 0, amountSOut + 8_000_000);
     }
 
     // TODO: test precision with extremes price bounds (BTC / SHIB)
@@ -397,9 +363,9 @@ contract InvariantTest is TestHelper {
         base.mint(cuh, r0);
 
         vm.prank(cuh);
-        base.approve(address(this), r0);
+        base.transfer(address(_pair), r0);
 
-        _pair.mint(r0, 0, 1 ether, abi.encode(CallbackHelper.CallbackData({ key: key, payer: cuh })));
+        _pair.mint(1 ether);
 
         uint256 value = r0;
         uint256 scale = 10**6;
@@ -421,11 +387,11 @@ contract InvariantTest is TestHelper {
         speculative.mint(cuh, r1);
 
         vm.prank(cuh);
-        base.approve(address(this), r0);
+        base.transfer(address(_pair), r0);
         vm.prank(cuh);
-        speculative.approve(address(this), r1);
+        speculative.transfer(address(_pair), r1);
 
-        _pair.mint(r0, r1, 1 ether, abi.encode(CallbackHelper.CallbackData({ key: key, payer: cuh })));
+        _pair.mint(1 ether);
 
         uint256 value = r0 + (price * r1) / 1 ether;
         uint256 scale = 10**6;
@@ -445,12 +411,14 @@ contract InvariantTest is TestHelper {
     //     base.mint(cuh, r0);
 
     //     vm.prank(cuh);
-    //     base.approve(address(this), r0);
+    //     base.transfer(address(_pair), r0);
 
-    //     _pair.mint(r0, 0, 10**15, abi.encode(CallbackHelper.CallbackData({ key: key, payer: cuh })));
+    //     _pair.mint(10**15);
 
     //     uint256 value = r0;
     //     uint256 scale = 10**6;
     //     console2.log("Dollars per LP token * 10**18", value / scale);
     // }
+
+    // TODO: test zero liquidity
 }
