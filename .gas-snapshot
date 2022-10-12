@@ -1,6 +1,6 @@
 InvariantTest:testBaseInvariantError() (gas: 106482)
 InvariantTest:testBaseUpperBound() (gas: 151708)
-InvariantTest:testBurnAmount() (gas: 266632)
+InvariantTest:testBurnAmount() (gas: 266632) (gas: 215570) (gas: 214370)
 InvariantTest:testBurnDoubleWithDonation() (gas: 534277)
 InvariantTest:testBurnWithDonation() (gas: 312904)
 InvariantTest:testDivideByZero() (gas: 170605)

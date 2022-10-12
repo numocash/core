@@ -309,7 +309,7 @@ contract MultiUserTest is TestHelper {
         _mintMaker(1 ether, 8 ether, 1 ether, 1, cuh);
         _mintMaker(1 ether, 8 ether, 1 ether, 2, dennis);
         _mint(15 ether, address(this));
-        pair.burn(address(this));
+        pair.burn(address(this), 1.5 ether, 12 ether, 1.5 ether);
         _mintMaker(1 ether, 8 ether, 1 ether, 1, cuh);
 
         bytes32 cuhPositionID = Position.getId(cuh, 1);
@@ -351,7 +351,7 @@ contract MultiUserTest is TestHelper {
     function testMintNewUtilizedMaker() public {
         _mintMaker(1 ether, 8 ether, 1 ether, 2, cuh);
         _mint(5 ether, address(this));
-        pair.burn(address(this));
+        pair.burn(address(this), 0.5 ether, 4 ether, 0.5 ether);
         _mintMaker(1 ether, 8 ether, 1 ether, 1, dennis);
 
         bytes32 cuhPositionID = Position.getId(cuh, 2);

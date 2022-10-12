@@ -129,7 +129,7 @@ contract InvariantTest is TestHelper {
     function testBurnAmount() public {
         _pairMint(9 ether, 4 ether, 1 ether, cuh);
 
-        pair.burn(cuh);
+        pair.burn(cuh, 9 ether, 4 ether, 1 ether);
 
         assertEq(base.balanceOf(cuh), 9 ether);
         assertEq(speculative.balanceOf(cuh), 4 ether);
@@ -145,7 +145,7 @@ contract InvariantTest is TestHelper {
         assertEq(pair.totalSupply(), 1 ether + 1_000_000);
         assertEq(pair.buffer(), 1_000_000);
 
-        pair.burn(dennis);
+        pair.burn(dennis, 1_000_000, 8_000_000, 1_000_000);
 
         assertEq(base.balanceOf(dennis), 1_000_000);
         assertEq(speculative.balanceOf(dennis), 8_000_000);
@@ -158,7 +158,7 @@ contract InvariantTest is TestHelper {
         assertEq(pair.buffer(), 1 ether);
         assertEq(pair.totalSupply(), 1 ether);
 
-        pair.burn(cuh);
+        pair.burn(cuh, 1 ether, 8 ether, 1 ether);
 
         assertEq(pair.totalSupply(), 0);
         assertEq(pair.buffer(), 0);
@@ -249,25 +249,25 @@ contract InvariantTest is TestHelper {
         assertEq(balanceSpec, 0);
     }
 
-    function testBurnWithDonation() public {
-        _pairMint(9 ether, 4 ether, 1 ether, cuh);
+    // function testBurnWithDonation() public {
+    //     _pairMint(9 ether, 4 ether, 1 ether, cuh);
 
-        base.mint(dennis, 9 ether);
-        speculative.mint(dennis, 4 ether);
+    //     base.mint(dennis, 9 ether);
+    //     speculative.mint(dennis, 4 ether);
 
-        vm.startPrank(dennis);
-        base.transfer(address(pair), 9 ether);
-        speculative.transfer(address(pair), 4 ether);
-        vm.stopPrank();
+    //     vm.startPrank(dennis);
+    //     base.transfer(address(pair), 9 ether);
+    //     speculative.transfer(address(pair), 4 ether);
+    //     vm.stopPrank();
 
-        pair.burn(cuh);
+    //     pair.burn(cuh);
 
-        assertEq(base.balanceOf(cuh), 18 ether);
-        assertEq(speculative.balanceOf(cuh), 8 ether);
+    //     assertEq(base.balanceOf(cuh), 18 ether);
+    //     assertEq(speculative.balanceOf(cuh), 8 ether);
 
-        assertEq(pair.totalSupply(), 0);
-        assertEq(pair.buffer(), 0);
-    }
+    //     assertEq(pair.totalSupply(), 0);
+    //     assertEq(pair.buffer(), 0);
+    // }
 
     function testMintWithDonation() public {
         _mintMaker(9 ether, 4 ether, 1 ether, 1, cuh);
@@ -277,7 +277,7 @@ contract InvariantTest is TestHelper {
 
         pair.mint(1 ether);
 
-        pair.burn(dennis);
+        pair.burn(dennis, 9 ether, 4 ether, 1 ether);
 
         assertEq(base.balanceOf(dennis), 9 ether);
         assertEq(speculative.balanceOf(dennis), 4 ether);
@@ -290,7 +290,7 @@ contract InvariantTest is TestHelper {
         assertEq(pair.buffer(), 1 ether);
         assertEq(pair.totalSupply(), 1 ether);
 
-        pair.burn(cuh);
+        pair.burn(cuh, 9 ether, 4 ether, 1 ether);
 
         assertEq(pair.totalSupply(), 0);
         assertEq(pair.buffer(), 0);

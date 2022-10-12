@@ -123,13 +123,14 @@ contract Pair {
         emit Mint(msg.sender, liquidity);
     }
 
-    function burn(address to) external lock returns (uint256 amount0, uint256 amount1) {
-        (uint256 balance0, uint256 balance1) = balances();
-        uint256 liquidity = buffer;
-        uint256 _totalSupply = totalSupply;
-
-        amount0 = (liquidity * balance0) / _totalSupply;
-        amount1 = (liquidity * balance1) / _totalSupply;
+    // TODO: is it possible to recover donated funds?
+    function burn(
+        address to,
+        uint256 amount0,
+        uint256 amount1,
+        uint256 liquidity
+    ) external lock {
+        if (!verifyInvariant(amount0, amount1, liquidity)) revert InvariantError();
 
         if (amount0 == 0 && amount1 == 0) revert InsufficientOutputError();
         _burn(liquidity);
