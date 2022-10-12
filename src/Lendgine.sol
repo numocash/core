@@ -12,6 +12,8 @@ import { Tick } from "./libraries/Tick.sol";
 import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
 import { ERC20 } from "solmate/tokens/ERC20.sol";
 
+import "forge-std/console2.sol";
+
 /// @notice A general purpose funding rate engine
 /// @author Kyle Scott (https://github.com/numoen/core/blob/master/src/Lendgine.sol)
 /// @author Modified from Uniswap (https://github.com/Uniswap/v3-core/blob/main/contracts/UniswapV3Pool.sol)
@@ -77,7 +79,7 @@ contract Lendgine is ERC20 {
 
     mapping(uint24 => Tick.Info) public ticks;
 
-    // tick 0 corresponds to empty
+    /// @dev tick 0 corresponds to an uninitialized state
     uint24 public currentTick;
 
     uint256 public currentLiquidity;
@@ -134,9 +136,7 @@ contract Lendgine is ERC20 {
 
         if (shares == 0) revert InsufficientOutputError();
 
-        uint256 interestNumeratorDelta = increaseCurrentLiquidity(liquidity);
-        interestNumerator += interestNumeratorDelta;
-        totalLiquidityBorrowed += liquidity;
+        increaseCurrentLiquidity(liquidity);
 
         _mint(to, shares); // optimistically mint
         Pair(pair).addBuffer(liquidity);
@@ -176,95 +176,78 @@ contract Lendgine is ERC20 {
     //////////////////////////////////////////////////////////////*/
 
     function deposit(address recipient, uint24 tick) external lock {
-        uint256 amountLP = Pair(pair).buffer();
+        uint256 liquidity = Pair(pair).buffer();
 
-        Position.Info storage position = positions.get(recipient, tick);
+        if (liquidity == 0) revert InsufficientOutputError();
+        if (tick == 0) revert InvalidTick();
+
         bytes32 id = Position.getId(recipient, tick);
 
-        if (amountLP == 0) revert InsufficientOutputError();
-        if (tick == 0) revert InvalidTick();
-
-        // trigger accruals if current position is utilized
-        {
-            bool utilized = (currentTick == tick && currentLiquidity > 0) || (tick < currentTick);
-
-            if (utilized) {
-                _accrueInterest();
-                if (tick != currentTick) _accrueTickInterest(tick);
-                _accrueMakerInterest(id, tick);
-            }
-        }
-
-        ticks.update(tick, int256(amountLP));
-        position.update(int256(amountLP));
-
-        // remove liquidity if we bumped someone out
-        if (tick < currentTick) {
-            // TODO: update interestNumerator
-            decreaseCurrentLiquidity(amountLP);
-        }
-
-        if (currentTick == 0) {
-            currentTick = tick;
-        }
-
-        Pair(pair).removeBuffer(amountLP);
-
-        emit Deposit(msg.sender, recipient, amountLP, tick);
-    }
-
-    function withdraw(uint24 tick, uint256 amountLP) external lock {
-        if (tick == 0) revert InvalidTick();
-
-        Position.Info storage position = positions.get(msg.sender, tick);
-        bytes32 id = Position.getId(msg.sender, tick);
-
         bool utilized = (currentTick == tick && currentLiquidity > 0) || (tick < currentTick);
-
         if (utilized) {
             _accrueInterest();
             if (tick != currentTick) _accrueTickInterest(tick);
             _accrueMakerInterest(id, tick);
         }
 
-        if (amountLP == 0) revert InsufficientOutputError();
+        ticks.update(tick, int256(liquidity));
+        positions.update(id, int256(liquidity));
 
-        uint256 utilizedLP;
+        // TODO: update interest numerator
 
-        if (tick == currentTick) {
-            if (currentLiquidity > position.liquidity - amountLP) {
-                utilizedLP = currentLiquidity - (position.liquidity - amountLP);
-            }
-
-            if (amountLP == position.liquidity) {
-                // if fully removing position
-                // TODO: write to stack instead
-                currentLiquidity = 0;
-            }
-        } else if (tick < currentTick) {
-            utilizedLP = amountLP;
+        if (tick < currentTick) {
+            interestNumerator += liquidity * tick;
+            decreaseCurrentLiquidity(liquidity);
         }
 
-        if (amountLP > position.liquidity) revert InsufficientPositionError();
+        if (currentTick == 0) {
+            currentTick = tick;
+        }
+
+        Pair(pair).removeBuffer(liquidity);
+        emit Deposit(msg.sender, recipient, liquidity, tick);
+    }
+
+    function withdraw(uint24 tick, uint256 liquidity) external lock {
+        if (liquidity == 0) revert InsufficientOutputError();
+        if (tick == 0) revert InvalidTick();
+
+        bytes32 id = Position.getId(msg.sender, tick);
+        Position.Info memory positionInfo = positions.get(msg.sender, tick);
+        Tick.Info memory tickInfo = ticks[tick];
+
+        if (liquidity > positionInfo.liquidity) revert InsufficientPositionError();
+
+        if ((currentTick == tick && currentLiquidity > 0) || (tick < currentTick)) {
+            _accrueInterest();
+            if (tick != currentTick) _accrueTickInterest(tick);
+            _accrueMakerInterest(id, tick);
+        }
+
+        uint256 utilizedLiquidity = 0;
+        uint256 remainingLiquidity = tickInfo.liquidity - liquidity;
+        if (tick < currentTick) {
+            utilizedLiquidity = liquidity;
+        } else if (tick == currentTick && currentLiquidity > remainingLiquidity) {
+            utilizedLiquidity = currentLiquidity - remainingLiquidity;
+            currentTick += 1;
+            currentLiquidity = 0;
+        }
 
         // Remove position from the data structure
-        // if tick needs to advance to the next tick
-        if (currentTick == tick && currentLiquidity > position.liquidity - amountLP) {
-            currentLiquidity = position.liquidity - amountLP;
-        }
+        ticks.update(tick, -int256(liquidity));
+        positions.update(id, -int256(liquidity));
 
-        ticks.update(tick, -int256(amountLP));
-        position.update(-int256(amountLP));
+        totalLiquidityBorrowed -= utilizedLiquidity;
+        interestNumerator -= utilizedLiquidity * tick;
 
         // Replace if we removed utilized liquidity
-        if (utilizedLP > 0) {
-            // TODO: update interestNumerator
-            increaseCurrentLiquidity(utilizedLP);
+        if (utilizedLiquidity > 0) {
+            increaseCurrentLiquidity(utilizedLiquidity);
         }
 
-        Pair(pair).addBuffer(amountLP);
-
-        emit Withdraw(msg.sender, amountLP, tick);
+        Pair(pair).addBuffer(liquidity);
+        emit Withdraw(msg.sender, liquidity, tick);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -347,13 +330,15 @@ contract Lendgine is ERC20 {
     //////////////////////////////////////////////////////////////*/
 
     /// @dev Current position is assumed to be valid
-    function increaseCurrentLiquidity(uint256 amountLP) private returns (uint256 interestNumeratorDelta) {
+    function increaseCurrentLiquidity(uint256 amountLP) private {
         uint24 _currentTick = currentTick;
         Tick.Info memory currentTickInfo = ticks[_currentTick];
 
-        // amount of speculative in this tick available
+        // amount of liquidity in this tick available
         uint256 remainingCurrentLiquidity = currentTickInfo.liquidity - currentLiquidity;
-        uint256 remainingLP = amountLP; // amount of pair lp tokens to be added
+        // amount of pair lp tokens to be added
+        uint256 remainingLP = amountLP;
+        uint256 interestNumeratorDelta = 0;
 
         while (true) {
             if (remainingCurrentLiquidity >= remainingLP) {
@@ -362,7 +347,6 @@ contract Lendgine is ERC20 {
                 interestNumeratorDelta += _currentTick * remainingCurrentLiquidity;
 
                 _currentTick = _currentTick + 1;
-                currentLiquidity = 0;
                 // TODO: error when max tick is reached
                 currentTickInfo = ticks[_currentTick];
 
@@ -371,7 +355,8 @@ contract Lendgine is ERC20 {
             }
         }
 
-        interestNumeratorDelta += _currentTick * remainingLP;
+        interestNumerator += interestNumeratorDelta + _currentTick * remainingLP;
+        totalLiquidityBorrowed += amountLP;
         currentTick = _currentTick;
         currentLiquidity += remainingLP;
     }

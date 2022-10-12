@@ -6,7 +6,6 @@ import { LiquidityMath } from "./LiquidityMath.sol";
 /// @notice Library for handling Lendgine Maker positions
 /// @author Kyle Scott (https://github.com/kyscott18/kyleswap2.5/blob/main/src/ERC20.sol)
 /// @author Modified from Uniswap (https://github.com/transmissions11/solmate/blob/main/src/tokens/ERC20.sol)
-/// @dev Implements a doubley linked list
 library Position {
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
@@ -28,13 +27,16 @@ library Position {
                               POSITION LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev -liquidityDelta should not equal self.liquidity
-    function update(Info storage self, int256 liquidityDelta) internal {
-        Info memory _self = self;
+    function update(
+        mapping(bytes32 => Position.Info) storage self,
+        bytes32 id,
+        int256 liquidityDelta
+    ) internal {
+        Position.Info storage info = self[id];
 
         if (liquidityDelta == 0) revert NoLiquidityError();
 
-        self.liquidity = LiquidityMath.addDelta(_self.liquidity, liquidityDelta);
+        info.liquidity = LiquidityMath.addDelta(info.liquidity, liquidityDelta);
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -343,6 +343,8 @@ contract MultiUserTest is TestHelper {
         assertEq(lendgine.currentLiquidity(), 1.5 ether);
         assertEq(lendgine.rewardPerINStored(), 0);
         assertEq(lendgine.lastUpdate(), 1);
+        assertEq(lendgine.totalLiquidityBorrowed(), 1.5 ether);
+        assertEq(lendgine.interestNumerator(), 1.5 ether);
 
         assertEq(pair.totalSupply(), 1.5 ether);
         assertEq(pair.buffer(), 0);
