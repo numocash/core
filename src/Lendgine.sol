@@ -127,16 +127,23 @@ contract Lendgine is ERC20 {
         uint256 amountS,
         bytes calldata data
     ) external lock returns (uint256) {
+        StateCache memory cache = loadCache();
+
         _accrueInterest();
 
-        if (currentTick == 0) revert CompleteUtilizationError();
+        if (cache.currentTick == 0) revert CompleteUtilizationError();
 
         uint256 liquidity = convertAssetToLiquidity(amountS);
         uint256 shares = convertLiquidityToShare(liquidity);
 
         if (shares == 0) revert InsufficientOutputError();
 
-        increaseCurrentLiquidity(liquidity);
+        increaseCurrentLiquidity(liquidity, cache);
+
+        currentTick = cache.currentTick;
+        currentLiquidity = cache.currentLiquidity;
+        interestNumerator = cache.interestNumerator;
+        totalLiquidityBorrowed = cache.totalLiquidityBorrowed;
 
         _mint(to, shares); // optimistically mint
         Pair(pair).addBuffer(liquidity);
@@ -151,6 +158,8 @@ contract Lendgine is ERC20 {
     }
 
     function burn(address to) external lock returns (uint256) {
+        StateCache memory cache = loadCache();
+
         _accrueInterest();
 
         uint256 shares = balanceOf[address(this)];
@@ -176,6 +185,8 @@ contract Lendgine is ERC20 {
     //////////////////////////////////////////////////////////////*/
 
     function deposit(address recipient, uint24 tick) external lock {
+        StateCache memory cache = loadCache();
+
         uint256 liquidity = Pair(pair).buffer();
 
         if (liquidity == 0) revert InsufficientOutputError();
@@ -183,10 +194,10 @@ contract Lendgine is ERC20 {
 
         bytes32 id = Position.getId(recipient, tick);
 
-        bool utilized = (currentTick == tick && currentLiquidity > 0) || (tick < currentTick);
+        bool utilized = (cache.currentTick == tick && cache.currentLiquidity > 0) || (tick < cache.currentTick);
         if (utilized) {
             _accrueInterest();
-            if (tick != currentTick) _accrueTickInterest(tick);
+            if (tick != cache.currentTick) _accrueTickInterest(tick);
             _accrueMakerInterest(id, tick);
         }
 
@@ -195,12 +206,12 @@ contract Lendgine is ERC20 {
 
         // TODO: update interest numerator
 
-        if (tick < currentTick) {
+        if (tick < cache.currentTick) {
             interestNumerator += liquidity * tick;
             decreaseCurrentLiquidity(liquidity);
         }
 
-        if (currentTick == 0) {
+        if (cache.currentTick == 0) {
             currentTick = tick;
         }
 
@@ -209,6 +220,8 @@ contract Lendgine is ERC20 {
     }
 
     function withdraw(uint24 tick, uint256 liquidity) external lock {
+        StateCache memory cache = loadCache();
+
         if (liquidity == 0) revert InsufficientOutputError();
         if (tick == 0) revert InvalidTick();
 
@@ -218,33 +231,38 @@ contract Lendgine is ERC20 {
 
         if (liquidity > positionInfo.liquidity) revert InsufficientPositionError();
 
-        if ((currentTick == tick && currentLiquidity > 0) || (tick < currentTick)) {
+        if ((cache.currentTick == tick && cache.currentLiquidity > 0) || (tick < cache.currentTick)) {
             _accrueInterest();
-            if (tick != currentTick) _accrueTickInterest(tick);
+            if (tick != cache.currentTick) _accrueTickInterest(tick);
             _accrueMakerInterest(id, tick);
         }
 
         uint256 utilizedLiquidity = 0;
         uint256 remainingLiquidity = tickInfo.liquidity - liquidity;
-        if (tick < currentTick) {
+        if (tick < cache.currentTick) {
             utilizedLiquidity = liquidity;
-        } else if (tick == currentTick && currentLiquidity > remainingLiquidity) {
-            utilizedLiquidity = currentLiquidity - remainingLiquidity;
-            currentTick += 1;
-            currentLiquidity = 0;
+        } else if (tick == cache.currentTick && cache.currentLiquidity > remainingLiquidity) {
+            utilizedLiquidity = cache.currentLiquidity - remainingLiquidity;
+
+            cache.currentTick += 1;
+            cache.currentLiquidity = 0;
         }
 
         // Remove position from the data structure
         ticks.update(tick, -int256(liquidity));
         positions.update(id, -int256(liquidity));
 
-        totalLiquidityBorrowed -= utilizedLiquidity;
-        interestNumerator -= utilizedLiquidity * tick;
+        cache.totalLiquidityBorrowed -= utilizedLiquidity;
+        cache.interestNumerator -= utilizedLiquidity * tick;
 
         // Replace if we removed utilized liquidity
         if (utilizedLiquidity > 0) {
-            increaseCurrentLiquidity(utilizedLiquidity);
+            increaseCurrentLiquidity(utilizedLiquidity, cache);
         }
+
+        currentTick = cache.currentTick;
+        currentLiquidity = cache.currentLiquidity;
+        interestNumerator = cache.interestNumerator;
 
         Pair(pair).addBuffer(liquidity);
         emit Withdraw(msg.sender, liquidity, tick);
@@ -313,6 +331,27 @@ contract Lendgine is ERC20 {
                                 VIEW
     //////////////////////////////////////////////////////////////*/
 
+    struct StateCache {
+        uint24 currentTick;
+        uint256 currentLiquidity;
+        uint256 interestNumerator;
+        uint256 totalLiquidityBorrowed;
+    }
+
+    function loadCache() private view returns (StateCache memory) {
+        return
+            StateCache({
+                currentTick: currentTick,
+                currentLiquidity: currentLiquidity,
+                interestNumerator: interestNumerator,
+                totalLiquidityBorrowed: totalLiquidityBorrowed
+            });
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                                VIEW
+    //////////////////////////////////////////////////////////////*/
+
     function balanceSpeculative() public view returns (uint256) {
         bool success;
         bytes memory data;
@@ -330,35 +369,32 @@ contract Lendgine is ERC20 {
     //////////////////////////////////////////////////////////////*/
 
     /// @dev Current position is assumed to be valid
-    function increaseCurrentLiquidity(uint256 amountLP) private {
-        uint24 _currentTick = currentTick;
-        Tick.Info memory currentTickInfo = ticks[_currentTick];
+    function increaseCurrentLiquidity(uint256 amountLP, StateCache memory cache) private view {
+        Tick.Info memory currentTickInfo = ticks[cache.currentTick];
 
         // amount of liquidity in this tick available
-        uint256 remainingCurrentLiquidity = currentTickInfo.liquidity - currentLiquidity;
+        uint256 remainingCurrentLiquidity = currentTickInfo.liquidity - cache.currentLiquidity;
         // amount of pair lp tokens to be added
         uint256 remainingLP = amountLP;
-        uint256 interestNumeratorDelta = 0;
 
         while (true) {
             if (remainingCurrentLiquidity >= remainingLP) {
                 break;
             } else {
-                interestNumeratorDelta += _currentTick * remainingCurrentLiquidity;
+                cache.interestNumerator += cache.currentTick * remainingCurrentLiquidity;
 
-                _currentTick = _currentTick + 1;
+                cache.currentTick += 1;
                 // TODO: error when max tick is reached
-                currentTickInfo = ticks[_currentTick];
+                currentTickInfo = ticks[cache.currentTick];
 
                 remainingLP -= remainingCurrentLiquidity;
                 remainingCurrentLiquidity = currentTickInfo.liquidity;
             }
         }
 
-        interestNumerator += interestNumeratorDelta + _currentTick * remainingLP;
-        totalLiquidityBorrowed += amountLP;
-        currentTick = _currentTick;
-        currentLiquidity += remainingLP;
+        cache.interestNumerator += cache.currentTick * remainingLP;
+        cache.totalLiquidityBorrowed += amountLP;
+        cache.currentLiquidity += remainingLP;
     }
 
     /// @dev assumed to never decrease past zero
