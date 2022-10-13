@@ -434,4 +434,19 @@ contract MultiUserTest is TestHelper {
         assertEq(pair.totalSupply(), 2 * 1 ether);
         assertEq(pair.buffer(), 0.5 ether);
     }
+
+    function testRemoveSharedTick() public {
+        _mintMaker(1 ether, 8 ether, 1 ether, 1, cuh);
+        _mintMaker(1 ether, 8 ether, 1 ether, 1, dennis);
+        _mintMaker(1 ether, 8 ether, 1 ether, 2, dennis);
+        _mint(10 ether, address(this));
+        _burnMaker(0.5 ether, 1, cuh);
+
+        assertEq(lendgine.currentTick(), 1);
+        assertEq(lendgine.currentLiquidity(), 1 ether);
+        assertEq(lendgine.interestNumerator(), 1 ether);
+        assertEq(lendgine.rewardPerINStored(), 0);
+        assertEq(lendgine.lastUpdate(), 1);
+        assertEq(lendgine.totalLiquidityBorrowed(), 1 ether);
+    }
 }

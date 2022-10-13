@@ -88,9 +88,6 @@ contract Lendgine is ERC20 {
 
     mapping(uint16 => Tick.Info) public ticks;
 
-    /// @dev tick 0 corresponds to an uninitialized state
-    uint16 public currentTick;
-
     uint256 public currentLiquidity;
 
     uint256 public interestNumerator;
@@ -100,6 +97,9 @@ contract Lendgine is ERC20 {
     uint256 public rewardPerINStored;
 
     uint64 public lastUpdate;
+
+    /// @dev tick 0 corresponds to an uninitialized state
+    uint16 public currentTick;
 
     /*//////////////////////////////////////////////////////////////
                            REENTRANCY LOGIC
@@ -202,7 +202,7 @@ contract Lendgine is ERC20 {
         uint256 liquidity = Pair(pair).buffer();
 
         if (liquidity == 0) revert InsufficientOutputError();
-        if (tick == 0) revert InvalidTick();
+        if (tick == 0 || tick > MaxTick) revert InvalidTick();
 
         bytes32 id = Position.getID(to, tick);
 
@@ -353,10 +353,10 @@ contract Lendgine is ERC20 {
     //////////////////////////////////////////////////////////////*/
 
     struct StateCache {
-        uint16 currentTick;
         uint256 currentLiquidity;
         uint256 interestNumerator;
         uint256 totalLiquidityBorrowed;
+        uint16 currentTick;
     }
 
     function loadCache() private view returns (StateCache memory) {
