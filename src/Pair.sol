@@ -113,7 +113,7 @@ contract Pair {
         if (a > d) revert BaseInvariantError();
         if (scale1 > 2 * upperBound) revert SpeculativeInvariantError();
 
-        return d == (a + b - c);
+        return a + b == c + d;
     }
 
     function mint(

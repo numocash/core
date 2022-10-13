@@ -19,11 +19,12 @@ contract AccruePositionInterestTest is TestHelper {
 
         _mintMaker(1 ether, 8 ether, 1 ether, 1, cuh);
 
-        positionID = Position.getId(cuh, 1);
+        positionID = Position.getID(cuh, 1);
     }
 
     function testAccrueInterestBasic() public {
-        lendgine.accrueMakerInterest(positionID, 1);
+        vm.prank(cuh);
+        lendgine.accruePositionInterest(1);
 
         (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(positionID);
 
@@ -50,7 +51,8 @@ contract AccruePositionInterestTest is TestHelper {
     function testAccrueInterstNoTime() public {
         _mint(1 ether, cuh);
 
-        lendgine.accrueMakerInterest(positionID, 1);
+        vm.prank(cuh);
+        lendgine.accruePositionInterest(1);
 
         // Test lendgine token
         assertEq(lendgine.totalSupply(), 0.1 ether);
@@ -86,7 +88,8 @@ contract AccruePositionInterestTest is TestHelper {
 
         vm.warp(1 days + 1);
 
-        lendgine.accrueMakerInterest(positionID, 1);
+        vm.prank(cuh);
+        lendgine.accruePositionInterest(1);
 
         uint256 dilution = 0.1 ether / 10000;
 
