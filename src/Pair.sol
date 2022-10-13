@@ -10,6 +10,8 @@ import { ISwapCallback } from "./interfaces/ISwapCallback.sol";
 import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
 import { ERC20 } from "solmate/tokens/ERC20.sol";
 
+import "forge-std/console2.sol";
+
 /// @notice A gas efficient and opinionated capped power invariant pair
 /// @author Kyle Scott (https://github.com/numoen/core/blob/master/src/Pair.sol)
 /// @author Modified from Uniswap (https://github.com/Uniswap/v2-core/blob/master/contracts/UniswapV2Pair.sol)
@@ -106,12 +108,17 @@ contract Pair {
         uint256 scale1 = (r1 * 10**18) / shares;
 
         uint256 a = scale0 * 10**18;
-        uint256 b = upperBound * scale1;
+        uint256 b = upperBound * scale1 * 10**9;
         uint256 c = (scale1**2) / 4;
-        uint256 d = upperBound**2;
+        uint256 d = upperBound**2 * 10**18;
+
+        console2.log("a", a);
+        console2.log("b", b);
+        console2.log("c", c);
+        console2.log("d", d);
 
         if (a > d) revert BaseInvariantError();
-        if (scale1 > 2 * upperBound) revert SpeculativeInvariantError();
+        if (scale1 > 2 * upperBound * 10**9) revert SpeculativeInvariantError();
 
         return a + b == c + d;
     }
