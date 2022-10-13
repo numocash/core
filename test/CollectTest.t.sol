@@ -32,7 +32,7 @@ contract CollectTest is TestHelper {
         uint256 dilution = 0.1 ether / 10000;
 
         vm.prank(cuh);
-        lendgine.collect(cuh, 1, 0);
+        lendgine.collect(cuh, 1, (dilution * 10));
 
         // Test lendgine token
         assertEq(lendgine.totalSupply(), 0.1 ether);

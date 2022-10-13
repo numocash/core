@@ -3,7 +3,7 @@ pragma solidity ^0.8.4;
 
 import { LiquidityMath } from "./LiquidityMath.sol";
 
-/// @notice Library for handling Lendgine Maker positions
+/// @notice Library for handling Lendgine liquidity positions
 /// @author Kyle Scott (https://github.com/kyscott18/kyleswap2.5/blob/main/src/ERC20.sol)
 /// @author Modified from Uniswap (https://github.com/transmissions11/solmate/blob/main/src/tokens/ERC20.sol)
 library Position {
@@ -46,12 +46,12 @@ library Position {
     function get(
         mapping(bytes32 => Info) storage self,
         address owner,
-        uint24 tick
+        uint16 tick
     ) internal view returns (Position.Info storage position) {
         position = self[getID(owner, tick)];
     }
 
-    function getID(address owner, uint24 tick) internal pure returns (bytes32 id) {
+    function getID(address owner, uint16 tick) internal pure returns (bytes32 id) {
         id = keccak256(abi.encode(owner, tick));
     }
 }

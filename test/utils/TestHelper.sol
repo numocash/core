@@ -63,7 +63,7 @@ abstract contract TestHelper is Test, CallbackHelper {
         uint256 amountBase,
         uint256 amountSpeculative,
         uint256 liquidity,
-        uint24 tick,
+        uint16 tick,
         address spender
     ) internal {
         _pairMint(amountBase, amountSpeculative, liquidity, spender);
@@ -98,7 +98,7 @@ abstract contract TestHelper is Test, CallbackHelper {
 
     function _burnMaker(
         uint256 amountLP,
-        uint24 tick,
+        uint16 tick,
         address spender
     ) internal {
         vm.prank(spender);

@@ -22,7 +22,7 @@ contract Lendgine is ERC20 {
     using Position for mapping(bytes32 => Position.Info);
     using Position for Position.Info;
 
-    using Tick for mapping(uint24 => Tick.Info);
+    using Tick for mapping(uint16 => Tick.Info);
     using Tick for Tick.Info;
 
     /*//////////////////////////////////////////////////////////////
@@ -33,15 +33,20 @@ contract Lendgine is ERC20 {
 
     event Burn(address indexed sender, uint256 amountS, uint256 shares, uint256 liquidity, address indexed to);
 
-    event Deposit(address indexed sender, address indexed to, uint256 amountLP, uint24 tick);
+    event Deposit(address indexed sender, uint256 liquidity, uint16 tick, address indexed to);
 
-    event Withdraw(address indexed to, uint256 amountLP, uint24 tick);
+    event Withdraw(address indexed sender, uint256 liquidity, uint16 tick);
 
-    event AccrueInterest();
+    event AccrueInterest(uint256 timeElapsed, uint256 amountS, uint256 liquidity, uint256 rewardPerIN);
 
-    event AccrueTickInterest();
+    event AccrueTickInterest(uint16 indexed tick, uint256 rewardPerIN, uint256 tokensOwed);
 
-    event AccruePositionInterest();
+    event AccruePositionInterest(
+        uint16 indexed tick,
+        bytes32 indexed id,
+        uint256 rewardPerLiquidity,
+        uint256 tokensOwed
+    );
 
     event Collect(address indexed owner, address indexed to, uint256 amountBase);
 
@@ -69,6 +74,8 @@ contract Lendgine is ERC20 {
                                IMMUTABLES
     //////////////////////////////////////////////////////////////*/
 
+    uint16 public constant MaxTick = 10_000;
+
     address public immutable factory;
 
     address public immutable pair;
@@ -79,10 +86,10 @@ contract Lendgine is ERC20 {
 
     mapping(bytes32 => Position.Info) public positions;
 
-    mapping(uint24 => Tick.Info) public ticks;
+    mapping(uint16 => Tick.Info) public ticks;
 
     /// @dev tick 0 corresponds to an uninitialized state
-    uint24 public currentTick;
+    uint16 public currentTick;
 
     uint256 public currentLiquidity;
 
@@ -92,7 +99,7 @@ contract Lendgine is ERC20 {
 
     uint256 public rewardPerINStored;
 
-    uint40 public lastUpdate;
+    uint64 public lastUpdate;
 
     /*//////////////////////////////////////////////////////////////
                            REENTRANCY LOGIC
@@ -189,7 +196,7 @@ contract Lendgine is ERC20 {
                         DEPOSIT/WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function deposit(address to, uint24 tick) external lock {
+    function deposit(address to, uint16 tick) external lock {
         StateCache memory cache = loadCache();
 
         uint256 liquidity = Pair(pair).buffer();
@@ -222,10 +229,10 @@ contract Lendgine is ERC20 {
         }
 
         Pair(pair).removeBuffer(liquidity);
-        emit Deposit(msg.sender, to, liquidity, tick);
+        emit Deposit(msg.sender, liquidity, tick, to);
     }
 
-    function withdraw(uint24 tick, uint256 liquidity) external lock {
+    function withdraw(uint16 tick, uint256 liquidity) external lock {
         StateCache memory cache = loadCache();
 
         if (liquidity == 0) revert InsufficientOutputError();
@@ -282,7 +289,7 @@ contract Lendgine is ERC20 {
         _accrueInterest(cache);
     }
 
-    function accrueTickInterest(uint24 tick) external lock {
+    function accrueTickInterest(uint16 tick) external lock {
         if (tick == 0) revert InvalidTick();
         StateCache memory cache = loadCache();
 
@@ -290,7 +297,7 @@ contract Lendgine is ERC20 {
         if (tick != currentTick) _accrueTickInterest(tick);
     }
 
-    function accruePositionInterest(uint24 tick) external lock {
+    function accruePositionInterest(uint16 tick) external lock {
         if (tick == 0) revert InvalidTick();
 
         bytes32 id = Position.getID(msg.sender, tick);
@@ -303,7 +310,7 @@ contract Lendgine is ERC20 {
 
     function collect(
         address to,
-        uint24 tick,
+        uint16 tick,
         uint256 amountSRequested
     ) external lock returns (uint256 amountS) {
         if (tick == 0) revert InvalidTick();
@@ -346,7 +353,7 @@ contract Lendgine is ERC20 {
     //////////////////////////////////////////////////////////////*/
 
     struct StateCache {
-        uint24 currentTick;
+        uint16 currentTick;
         uint256 currentLiquidity;
         uint256 interestNumerator;
         uint256 totalLiquidityBorrowed;
@@ -394,12 +401,12 @@ contract Lendgine is ERC20 {
             if (remainingCurrentLiquidity >= remainingLP) {
                 break;
             } else {
+                if (cache.currentTick == MaxTick) revert CompleteUtilizationError();
+
                 cache.interestNumerator += cache.currentTick * remainingCurrentLiquidity;
-
                 cache.currentTick += 1;
-                // TODO: error when max tick is reached
-                currentTickInfo = ticks[cache.currentTick];
 
+                currentTickInfo = ticks[cache.currentTick];
                 remainingLP -= remainingCurrentLiquidity;
                 remainingCurrentLiquidity = currentTickInfo.liquidity;
             }
@@ -439,17 +446,19 @@ contract Lendgine is ERC20 {
 
     function _accrueInterest(StateCache memory cache) private {
         if (totalSupply == 0) {
-            lastUpdate = uint40(block.timestamp);
+            lastUpdate = uint64(block.timestamp);
             return;
         }
 
         uint256 timeElapsed = block.timestamp - lastUpdate;
         if (timeElapsed == 0 || cache.interestNumerator == 0) return;
 
-        // calculate how much must be removed
-        uint256 dilutionLP = (cache.interestNumerator * timeElapsed) / (1 days * 10_000);
-        uint256 dilutionSpeculative = convertLiquidityToAsset(dilutionLP);
+        uint256 dilutionLPRequested = (cache.interestNumerator * timeElapsed) / (1 days * 10_000);
+        uint256 dilutionLP = dilutionLPRequested > cache.totalLiquidityBorrowed
+            ? cache.totalLiquidityBorrowed
+            : dilutionLPRequested;
 
+        uint256 dilutionSpeculative = convertLiquidityToAsset(dilutionLP);
         rewardPerINStored += (dilutionSpeculative * 1 ether) / cache.interestNumerator;
 
         _accrueTickInterest(currentTick);
@@ -460,12 +469,12 @@ contract Lendgine is ERC20 {
         interestNumerator = cache.interestNumerator;
         currentLiquidity = cache.currentLiquidity;
         currentTick = cache.currentTick;
-        lastUpdate = uint40(block.timestamp);
+        lastUpdate = uint64(block.timestamp);
 
-        emit AccrueInterest();
+        emit AccrueInterest(timeElapsed, dilutionSpeculative, dilutionLP, rewardPerINStored);
     }
 
-    function _accrueTickInterest(uint24 tick) private {
+    function _accrueTickInterest(uint16 tick) private {
         if (tick > currentTick) revert UnutilizedAccrueError();
 
         Tick.Info storage tickInfo = ticks[tick];
@@ -479,11 +488,11 @@ contract Lendgine is ERC20 {
                 _tickInfo.tokensOwedPerLiquidity +
                 ((tokensOwed * 1 ether) / _tickInfo.liquidity);
 
-        emit AccrueTickInterest();
+        emit AccrueTickInterest(tick, rewardPerINStored, tokensOwed);
     }
 
     /// @dev assume global interest accrual is up to date
-    function _accruePositionInterest(bytes32 id, uint24 tick) private {
+    function _accruePositionInterest(bytes32 id, uint16 tick) private {
         Position.Info storage position = positions[id];
         Position.Info memory _position = position;
 
@@ -492,14 +501,14 @@ contract Lendgine is ERC20 {
 
         uint256 tokensOwed = newTokensOwed(_position, _tickInfo);
 
-        position.rewardPerLiquidityPaid = tickInfo.tokensOwedPerLiquidity;
+        position.rewardPerLiquidityPaid = _tickInfo.tokensOwedPerLiquidity;
         position.tokensOwed = _position.tokensOwed + tokensOwed;
 
-        emit AccruePositionInterest();
+        emit AccruePositionInterest(tick, id, _tickInfo.tokensOwedPerLiquidity, tokensOwed);
     }
 
     /// @dev Assumes reward per token stored is up to date
-    function newTokensOwed(Tick.Info memory tickInfo, uint24 tick) private view returns (uint256) {
+    function newTokensOwed(Tick.Info memory tickInfo, uint16 tick) private view returns (uint256) {
         if (tick > currentTick) return 0;
 
         uint256 liquidity = tickInfo.liquidity;
