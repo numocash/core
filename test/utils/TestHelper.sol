@@ -16,7 +16,7 @@ abstract contract TestHelper is Test, CallbackHelper {
     MockERC20 public immutable base;
     MockERC20 public immutable speculative;
 
-    uint256 public immutable upperBound = 5 * 10**9;
+    uint256 public immutable upperBound = 5 * 10**18;
 
     uint256 public immutable k = 10**36 + (5 * 10**36) - (1 ether**2) / 4;
 

@@ -99,6 +99,10 @@ contract Pair {
                               PAIR LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    // Shares scale 10**18
+    // bound scale 10**18
+    // precision scale 10**9
+
     function verifyInvariant(
         uint256 r0,
         uint256 r1,
@@ -107,15 +111,15 @@ contract Pair {
         uint256 scale0 = (r0 * 10**18) / shares;
         uint256 scale1 = (r1 * 10**18) / shares;
 
-        uint256 a = scale0 * 10**18;
-        uint256 b = upperBound * scale1 * 10**9;
-        uint256 c = (scale1**2) / 4;
-        uint256 d = upperBound**2 * 10**18;
+        uint256 a = scale0 * 10**9;
+        uint256 b = (upperBound * scale1) / 10**9;
+        uint256 c = (scale1**2) / (4 * 10**9);
+        uint256 d = upperBound**2 / 10**9;
 
-        console2.log("a", a);
-        console2.log("b", b);
-        console2.log("c", c);
-        console2.log("d", d);
+        // console2.log("a", a);
+        // console2.log("b", b);
+        // console2.log("c", c);
+        // console2.log("d", d);
 
         if (a > d) revert BaseInvariantError();
         if (scale1 > 2 * upperBound * 10**9) revert SpeculativeInvariantError();
