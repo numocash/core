@@ -3,6 +3,7 @@ pragma solidity ^0.8.4;
 
 import { Factory } from "./Factory.sol";
 import { Pair } from "./Pair.sol";
+import { ERC20 } from "./ERC20.sol";
 
 import { IMintCallback } from "./interfaces/IMintCallback.sol";
 
@@ -10,13 +11,9 @@ import { Position } from "./libraries/Position.sol";
 import { Tick } from "./libraries/Tick.sol";
 import { TickBitMaps } from "./libraries/TickBitMaps.sol";
 import { LiquidityMath } from "./libraries/LiquidityMath.sol";
+import { TransferHelper } from "./libraries/TransferHelper.sol";
 
-import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
-import { ERC20 } from "solmate/tokens/ERC20.sol";
-
-import "forge-std/console2.sol";
-
-/// @notice A general purpose funding rate engine
+/// @notice A CFMM share lending engine
 /// @author Kyle Scott (https://github.com/numoen/core/blob/master/src/Lendgine.sol)
 /// @author Modified from Uniswap (https://github.com/Uniswap/v3-core/blob/main/contracts/UniswapV3Pool.sol)
 /// and Primitive (https://github.com/primitivefinance/rmm-core/blob/main/contracts/PrimitiveEngine.sol)
@@ -75,11 +72,13 @@ contract Lendgine is ERC20 {
     /*//////////////////////////////////////////////////////////////
                                IMMUTABLES
     //////////////////////////////////////////////////////////////*/
-
+    /// @notice The maximum allowed interest rate tick
     uint16 public constant MaxTick = 10_000;
 
+    /// @notice The contract that deployed the lendgine
     address public immutable factory;
 
+    /// @notice The CFMM that is used in the lendgine
     address public immutable pair;
 
     /*//////////////////////////////////////////////////////////////
@@ -90,26 +89,33 @@ contract Lendgine is ERC20 {
 
     mapping(uint16 => Tick.Info) public ticks;
 
+    /// @notice BitMap used for keeping track of which tick contain >0 liquidity
     TickBitMaps.TickBitMap public tickBitMap;
 
+    /// @notice The liquidity in the `currentTick`
     uint256 public currentLiquidity;
 
+    /// @notice The sum of tick * borrow liquidity for all borrowed liquidity
     uint256 public interestNumerator;
 
+    /// @notice The currently borrowed liquidity by borrowers
     uint256 public totalLiquidityBorrowed;
 
+    /// @notice The amount of speculative assert rewarded to each unit of `interestNumerator` scaled by one ether
     uint256 public rewardPerINStored;
 
+    /// @notice The timestamp at which interest was last accrued
     uint64 public lastUpdate;
 
-    /// @dev tick 0 corresponds to an uninitialized state
+    /// @notice The index of the highest tick that is being borrowed from
+    /// @dev A value of 0 corresponds to an uninitialized state
     uint16 public currentTick;
 
     /*//////////////////////////////////////////////////////////////
                            REENTRANCY LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    uint256 private locked = 1;
+    uint8 private locked = 1;
 
     modifier lock() virtual {
         if (locked != 1) revert ReentrancyError();
@@ -125,7 +131,7 @@ contract Lendgine is ERC20 {
                                CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
-    constructor() ERC20("Numoen Lendgine", "NLDG", 18) {
+    constructor() ERC20() {
         factory = msg.sender;
 
         pair = address(new Pair{ salt: keccak256(abi.encode(address(this))) }(msg.sender));
@@ -135,11 +141,19 @@ contract Lendgine is ERC20 {
                             MINT/BURN LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Creates a position with amountS `speculative` tokens as collateral and `pair` CFMM share
+    /// as debt, exactly replicating the desired payoff
+    /// @dev This function uses a callback architecture capable of flash-minting
+    /// @param to The address to mint the position to
+    /// @param amountS The amount of `speculative` tokens to use as collateral, which determines
+    /// the size of the position
+    /// @param data Any data that should be passed through to the callback
+    /// @return shares The size of the position that was sent to `to`
     function mint(
         address to,
         uint256 amountS,
         bytes calldata data
-    ) external lock returns (uint256) {
+    ) external lock returns (uint256 shares) {
         StateCache memory cache = loadCache();
 
         _accrueInterest(cache);
@@ -147,7 +161,7 @@ contract Lendgine is ERC20 {
         if (tickBitMap.firstTick == 0) revert CompleteUtilizationError();
 
         uint256 liquidity = convertAssetToLiquidity(amountS);
-        uint256 shares = convertLiquidityToShare(liquidity);
+        shares = convertLiquidityToShare(liquidity);
 
         if (shares == 0) revert InsufficientOutputError();
 
@@ -167,17 +181,21 @@ contract Lendgine is ERC20 {
         if (balanceAfter < balanceBefore + amountS) revert InsufficientInputError();
 
         emit Mint(msg.sender, amountS, shares, liquidity, to);
-        return shares;
     }
 
-    function burn(address to) external lock returns (uint256) {
+    /// @notice Burns a position, paying back debt and refunding collateral to the `to` address
+    /// @dev The position that is to be burned should be sent to this contract before invoking this function
+    /// @dev This assumes there is at least the amount of debt that is owed by this position
+    /// @param to The address to send the unlocked collateral to
+    /// @return amountS The amount of `speculative` tokens that have been sent to the `to` address
+    function burn(address to) external lock returns (uint256 amountS) {
         StateCache memory cache = loadCache();
 
         _accrueInterest(cache);
 
         uint256 shares = balanceOf[address(this)];
         uint256 liquidity = convertShareToLiquidity(shares);
-        uint256 amountS = convertLiquidityToAsset(liquidity);
+        amountS = convertLiquidityToAsset(liquidity);
 
         if (liquidity == 0) revert InsufficientOutputError();
 
@@ -190,16 +208,19 @@ contract Lendgine is ERC20 {
 
         _burn(address(this), shares);
         Pair(pair).removeBuffer(liquidity);
-        SafeTransferLib.safeTransfer(ERC20(Pair(pair).speculative()), to, amountS);
+        TransferHelper.safeTransfer(Pair(pair).speculative(), to, amountS);
 
         emit Burn(msg.sender, amountS, shares, liquidity, to);
-        return amountS;
     }
 
     /*//////////////////////////////////////////////////////////////
                         DEPOSIT/WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Deposit CFMM shares from the `pair` to be lent out
+    /// @dev The appropriate position should be minted in the pair contract before invoking this function
+    /// @param to The address for which the deposit will be owned by
+    /// @param tick The interest rate tick at which the liquidity can be lent out
     function deposit(address to, uint16 tick) external lock {
         StateCache memory cache = loadCache();
 
@@ -233,6 +254,10 @@ contract Lendgine is ERC20 {
         emit Deposit(msg.sender, liquidity, tick, to);
     }
 
+    /// @notice Withdraw CFMM shares from the lending engine
+    /// @dev The shares must still be withdrawn from the `pair`
+    /// @param tick The tick at which to remove shares
+    /// @param liquidity The amount of liquidity to remove
     function withdraw(uint16 tick, uint256 liquidity) external lock {
         StateCache memory cache = loadCache();
 
@@ -285,11 +310,15 @@ contract Lendgine is ERC20 {
                             INTEREST LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Calculates the interest rate and amount of interest that has gathered since the last update,
+    /// then charges the borrowers and pays the lenders
+    /// @dev Only positive interest rates are allowed
     function accrueInterest() external lock {
         StateCache memory cache = loadCache();
         _accrueInterest(cache);
     }
 
+    /// @notice Calculates the interest accrued by a specific tick
     function accrueTickInterest(uint16 tick) external lock {
         if (tick == 0 || tick > MaxTick) revert InvalidTick();
         StateCache memory cache = loadCache();
@@ -298,6 +327,9 @@ contract Lendgine is ERC20 {
         if (tick != currentTick) _accrueTickInterest(tick, cache);
     }
 
+    /// @notice Calculates the interest accrued by a specific postion
+    /// @dev msg.sender is used to calculate the owner of the position
+    /// @param tick The tick index of the position
     function accruePositionInterest(uint16 tick) external lock {
         if (tick == 0) revert InvalidTick();
 
@@ -309,6 +341,11 @@ contract Lendgine is ERC20 {
         _accruePositionInterest(id, tick);
     }
 
+    /// @notice Collects tokens owed to a postion
+    /// @dev msg.sender is used to calculative the owner of the position
+    /// @param to The address to send the collected tokens to
+    /// @param tick The tick index of the position
+    /// @param amountSRequested How much `speculative` tokens should be withdrawn from the tokens owed
     function collect(
         address to,
         uint16 tick,
@@ -322,7 +359,7 @@ contract Lendgine is ERC20 {
 
         if (amountS > 0) {
             position.tokensOwed -= amountS;
-            SafeTransferLib.safeTransfer(ERC20(Pair(pair).speculative()), to, amountS);
+            TransferHelper.safeTransfer(Pair(pair).speculative(), to, amountS);
         }
 
         emit Collect(msg.sender, to, amountS);
@@ -332,19 +369,23 @@ contract Lendgine is ERC20 {
                             ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Convert `pair` liquidity shares to amount of replicating derivative shares
     function convertLiquidityToShare(uint256 liquidity) public view returns (uint256) {
         uint256 _totalLiquidityBorrowed = totalLiquidityBorrowed;
         return _totalLiquidityBorrowed == 0 ? liquidity : (liquidity * totalSupply) / _totalLiquidityBorrowed;
     }
 
+    /// @notice Convert replicating derivative shares to `pair` liquidity shares
     function convertShareToLiquidity(uint256 shares) public view returns (uint256) {
         return (totalLiquidityBorrowed * shares) / totalSupply;
     }
 
+    /// @notice Convert `speculative` tokens to maximum amount of borrowable `pair` shares
     function convertAssetToLiquidity(uint256 assets) public view returns (uint256) {
         return (assets * 10**18) / (2 * Pair(pair).upperBound());
     }
 
+    /// @notice Convert `pair` liquidity shares to minimum amount of `speculative` collateral
     function convertLiquidityToAsset(uint256 liquidity) public view returns (uint256) {
         return (2 * liquidity * Pair(pair).upperBound()) / 10**18;
     }
@@ -374,6 +415,8 @@ contract Lendgine is ERC20 {
                                  VIEW
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Returns the `speculative` balances of the lendgine
+    /// @dev Not to be relied upon anywhere else because of a potential readonly reentracy
     function balanceSpeculative() public view returns (uint256) {
         bool success;
         bytes memory data;
@@ -390,6 +433,8 @@ contract Lendgine is ERC20 {
                          INTERNAL LIQUIDITY LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Updates a tick with the given liquidityDelta
+    /// @param tick The index of the tick to update
     function updateTick(uint16 tick, int256 liquidityDelta) private {
         Tick.Info storage info = ticks[tick];
 

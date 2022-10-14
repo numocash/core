@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.0;
 
-import "forge-std/console2.sol";
-
 library TickBitMaps {
     struct TickBitMap {
         uint256 blockMap;
@@ -56,8 +54,8 @@ library TickBitMaps {
         }
     }
 
-    /// @notice Returns the index of the most significant bit of the number, where the least significant bit is at index 0
-    /// and the most significant bit is at index 255
+    /// @notice Returns the index of the most significant bit of the number, where the least significant bit is at
+    /// index 0 and the most significant bit is at index 255
     /// @dev The function satisfies the property: x >= 2**mostSignificantBit(x) and x < 2**(mostSignificantBit(x)+1)
     /// @param x the value for which to compute the most significant bit, must be greater than 0
     /// @return r the index of the most significant bit
