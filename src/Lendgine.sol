@@ -222,7 +222,6 @@ contract Lendgine is ERC20 {
 
         if (tick < cache.currentTick) {
             cache.interestNumerator += liquidity * tick;
-
             decreaseCurrentLiquidity(liquidity, cache);
 
             interestNumerator = cache.interestNumerator;
@@ -401,22 +400,36 @@ contract Lendgine is ERC20 {
         bool uninit = info.liquidity == 0;
 
         if (init) {
-            uint16 below = tickBitMap.below(tick);
-            if (below != 0) {
-                uint16 above = ticks[below].next;
-                console2.log("insert", tick, below, above);
-                info.prev = below;
-                info.next = above;
-                ticks[below].next = tick;
-                ticks[above].prev = tick;
+            if (tickBitMap.firstTick == 0) {
+                tickBitMap.firstTick = tick;
+            } else if (tick < tickBitMap.firstTick) {
+                ticks[tickBitMap.firstTick].prev = tick;
+                info.next = tickBitMap.firstTick;
+                tickBitMap.firstTick = tick;
+            } else {
+                uint16 below = tickBitMap.below(tick);
+                // TODO: should below ever be zero?
+
+                if (below != 0) {
+                    uint16 above = ticks[below].next;
+                    info.prev = below;
+                    info.next = above;
+                    ticks[below].next = tick;
+                    ticks[above].prev = tick;
+                }
             }
 
             tickBitMap.flipTick(tick, true);
         } else if (uninit) {
-            uint16 below = info.prev;
-            uint16 above = info.next;
-            ticks[below].next = above;
-            ticks[above].prev = below;
+            if (tick == tickBitMap.firstTick) {
+                tickBitMap.firstTick = info.next;
+                ticks[info.next].prev = 0;
+            } else {
+                uint16 below = info.prev;
+                uint16 above = info.next;
+                ticks[below].next = above;
+                ticks[above].prev = below;
+            }
 
             tickBitMap.flipTick(tick, false);
             delete ticks[tick];

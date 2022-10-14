@@ -6,6 +6,7 @@ import "forge-std/console2.sol";
 library TickBitMaps {
     struct TickBitMap {
         uint256 blockMap;
+        uint16 firstTick;
         mapping(uint256 => uint256) blocks;
     }
 

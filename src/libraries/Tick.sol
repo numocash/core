@@ -2,10 +2,6 @@
 pragma solidity ^0.8.4;
 
 library Tick {
-    /*//////////////////////////////////////////////////////////////
-                                 ERRORS
-    //////////////////////////////////////////////////////////////*/
-
     struct Info {
         uint256 liquidity;
         uint256 rewardPerINPaid;
