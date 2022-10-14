@@ -237,7 +237,7 @@ contract Lendgine is ERC20 {
         StateCache memory cache = loadCache();
 
         if (liquidity == 0) revert InsufficientOutputError();
-        if (tick == 0) revert InvalidTick();
+        if (tick == 0 || tick > MaxTick) revert InvalidTick();
 
         bytes32 id = Position.getID(msg.sender, tick);
         Position.Info memory positionInfo = positions.get(msg.sender, tick);
@@ -291,7 +291,7 @@ contract Lendgine is ERC20 {
     }
 
     function accrueTickInterest(uint16 tick) external lock {
-        if (tick == 0) revert InvalidTick();
+        if (tick == 0 || tick > MaxTick) revert InvalidTick();
         StateCache memory cache = loadCache();
 
         _accrueInterest(cache);
@@ -314,7 +314,7 @@ contract Lendgine is ERC20 {
         uint16 tick,
         uint256 amountSRequested
     ) external lock returns (uint256 amountS) {
-        if (tick == 0) revert InvalidTick();
+        if (tick == 0 || tick > MaxTick) revert InvalidTick();
 
         Position.Info storage position = positions.get(msg.sender, tick);
 

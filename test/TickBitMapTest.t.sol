@@ -22,8 +22,8 @@ contract MultiUserTest is TestHelper {
     }
 
     function testEmptyBitMap() public {
-        assertEq(tickBitMap.below(1), 0);
-        assertEq(tickBitMap.below(2), 0);
+        vm.expectRevert();
+        tickBitMap.below(1);
     }
 
     function testFirstTick() public {
@@ -35,9 +35,64 @@ contract MultiUserTest is TestHelper {
     function testSecondTick() public {
         tickBitMap.flipTick(2, true);
 
+        vm.expectRevert();
         assertEq(tickBitMap.below(1), 0);
 
         tickBitMap.flipTick(1, true);
         assertEq(tickBitMap.below(3), 2);
+
+        tickBitMap.flipTick(2, false);
+        assertEq(tickBitMap.below(3), 1);
+    }
+
+    function testTwoTicksBelow() public {
+        tickBitMap.flipTick(1, true);
+        tickBitMap.flipTick(2, true);
+
+        assertEq(tickBitMap.below(3), 2);
+    }
+
+    function testBlockBelow() public {
+        tickBitMap.flipTick(5, true);
+
+        assertEq(tickBitMap.below(4 << 8), 5);
+    }
+
+    function testMaskSameBlock() public {
+        tickBitMap.flipTick(4, true);
+        tickBitMap.flipTick(7, true);
+        assertEq(tickBitMap.blockMap, 1);
+        assertEq(tickBitMap.below(5), 4);
+        assertEq(tickBitMap.below(10), 7);
+
+        tickBitMap.flipTick(7, false);
+        assertEq(tickBitMap.below(10), 4);
+    }
+
+    function testMaskBlock() public {
+        tickBitMap.flipTick(260, true);
+        assertEq(tickBitMap.blockMap, 2);
+        tickBitMap.flipTick(1026, true);
+        tickBitMap.flipTick(2050, true);
+
+        assertEq(tickBitMap.below(1030), 1026);
+        assertEq(tickBitMap.below(1025), 260);
+        assertEq(tickBitMap.below(9000), 2050);
+
+        tickBitMap.flipTick(1026, false);
+
+        assertEq(tickBitMap.below(1030), 260);
+        assertEq(tickBitMap.below(1025), 260);
+        assertEq(tickBitMap.below(9000), 2050);
+
+        tickBitMap.flipTick(2050, false);
+
+        assertEq(tickBitMap.below(1030), 260);
+        assertEq(tickBitMap.below(1025), 260);
+        assertEq(tickBitMap.below(9000), 260);
+
+        tickBitMap.flipTick(260, false);
+
+        assertEq(tickBitMap.blockMap, 0);
     }
 }

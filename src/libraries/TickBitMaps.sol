@@ -10,9 +10,12 @@ library TickBitMaps {
         mapping(uint256 => uint256) blocks;
     }
 
-    function position(uint16 tick) private pure returns (uint8 blockIdx, uint8 bitIdx) {
-        blockIdx = uint8(tick >> 8);
-        bitIdx = uint8(tick % 256);
+    function position(uint16 tick) private pure returns (uint256 blockIdx, uint256 bitIdx) {
+        unchecked {
+            blockIdx = tick >> 8;
+            bitIdx = tick % 256;
+            assert(blockIdx < 256);
+        }
     }
 
     function flipTick(
@@ -20,7 +23,7 @@ library TickBitMaps {
         uint16 tick,
         bool on
     ) internal {
-        (uint8 blockIdx, uint8 bitIdx) = position(tick);
+        (uint256 blockIdx, uint256 bitIdx) = position(tick);
 
         if (on) {
             self.blocks[blockIdx] |= 1 << bitIdx;
@@ -36,18 +39,21 @@ library TickBitMaps {
 
     /// @dev this is only called if there is a tick below
     function below(TickBitMap storage self, uint16 tick) internal view returns (uint16 tickBelow) {
-        (uint8 blockIdx, uint8 bitIdx) = position(tick);
-        uint256 bit = self.blocks[blockIdx] & ((1 << bitIdx) - 1);
+        unchecked {
+            (uint256 blockIdx, uint256 bitIdx) = position(tick);
 
-        // if there are no utilized ticks in the current block
-        if (bit == 0) {
-            uint256 _block = self.blockMap & ((1 << blockIdx) - 1);
-            if (_block == 0) return 0;
-            blockIdx = _msb(_block);
-            bit = self.blocks[blockIdx];
+            uint256 bit = self.blocks[blockIdx] & ((1 << bitIdx) - 1);
+
+            // if there are no utilized ticks in the current block
+            if (bit == 0) {
+                uint256 _block = self.blockMap & ((1 << blockIdx) - 1);
+                assert(_block != 0);
+                blockIdx = _msb(_block);
+                bit = self.blocks[blockIdx];
+            }
+
+            tickBelow = uint16((blockIdx << 8) | _msb(bit));
         }
-
-        tickBelow = (blockIdx << 8) | _msb(bit);
     }
 
     /// @notice Returns the index of the most significant bit of the number, where the least significant bit is at index 0
