@@ -82,18 +82,13 @@ abstract contract TestHelper is Test, CallbackHelper {
 
         if (spender != address(this)) {
             vm.prank(spender);
-            speculative.approve(address(this), amountSpeculative);
+            speculative.transfer(address(pair), amountSpeculative);
 
             vm.prank(spender);
-            base.approve(address(this), amountBase);
+            base.transfer(address(pair), amountBase);
         }
 
-        pair.mint(
-            amountBase,
-            amountSpeculative,
-            liquidity,
-            abi.encode(CallbackHelper.CallbackData({ key: key, payer: spender }))
-        );
+        pair.mint(liquidity);
     }
 
     function _burnMaker(
