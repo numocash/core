@@ -20,8 +20,8 @@ contract MultiUserTest is TestHelper {
         _mintMaker(1 ether, 8 ether, 1 ether, 1, cuh);
         _mintMaker(1 ether, 8 ether, 1 ether, 1, dennis);
 
-        bytes32 cuhPositionID = Position.getId(cuh, 1);
-        bytes32 dennisPositionID = Position.getId(dennis, 1);
+        bytes32 cuhPositionID = Position.getID(cuh, 1);
+        bytes32 dennisPositionID = Position.getID(dennis, 1);
 
         (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(cuhPositionID);
 
@@ -54,8 +54,8 @@ contract MultiUserTest is TestHelper {
         _mintMaker(1 ether, 8 ether, 1 ether, 1, cuh);
         _mintMaker(1 ether, 8 ether, 1 ether, 2, dennis);
 
-        bytes32 cuhPositionID = Position.getId(cuh, 1);
-        bytes32 dennisPositionID = Position.getId(dennis, 2);
+        bytes32 cuhPositionID = Position.getID(cuh, 1);
+        bytes32 dennisPositionID = Position.getID(dennis, 2);
 
         (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(cuhPositionID);
 
@@ -95,8 +95,8 @@ contract MultiUserTest is TestHelper {
         _mintMaker(1 ether, 8 ether, 1 ether, 2, dennis);
         _burnMaker(1 ether, 1, cuh);
 
-        bytes32 cuhPositionID = Position.getId(cuh, 1);
-        bytes32 dennisPositionID = Position.getId(dennis, 2);
+        bytes32 cuhPositionID = Position.getID(cuh, 1);
+        bytes32 dennisPositionID = Position.getID(dennis, 2);
 
         (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(cuhPositionID);
 
@@ -138,8 +138,8 @@ contract MultiUserTest is TestHelper {
         _mint(10 ether, address(this));
         _burnMaker(0.5 ether, 1, cuh);
 
-        bytes32 cuhPositionID = Position.getId(cuh, 1);
-        bytes32 dennisPositionID = Position.getId(dennis, 2);
+        bytes32 cuhPositionID = Position.getID(cuh, 1);
+        bytes32 dennisPositionID = Position.getID(dennis, 2);
 
         assertEq(lendgine.balanceOf(address(this)), 1 ether);
 
@@ -184,8 +184,8 @@ contract MultiUserTest is TestHelper {
         _mint(10 ether, address(this));
         _burnMaker(1 ether, 1, cuh);
 
-        bytes32 cuhPositionID = Position.getId(cuh, 1);
-        bytes32 dennisPositionID = Position.getId(dennis, 2);
+        bytes32 cuhPositionID = Position.getID(cuh, 1);
+        bytes32 dennisPositionID = Position.getID(dennis, 2);
 
         (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(cuhPositionID);
 
@@ -225,8 +225,8 @@ contract MultiUserTest is TestHelper {
         _mintMaker(1 ether, 8 ether, 1 ether, 2, dennis);
         _mint(15 ether, address(this));
 
-        bytes32 cuhPositionID = Position.getId(cuh, 1);
-        bytes32 dennisPositionID = Position.getId(dennis, 2);
+        bytes32 cuhPositionID = Position.getID(cuh, 1);
+        bytes32 dennisPositionID = Position.getID(dennis, 2);
 
         (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(cuhPositionID);
 
@@ -267,8 +267,8 @@ contract MultiUserTest is TestHelper {
         _mintMaker(1 ether, 8 ether, 1 ether, 10, dennis);
         _mint(15 ether, address(this));
 
-        bytes32 cuhPositionID = Position.getId(cuh, 1);
-        bytes32 dennisPositionID = Position.getId(dennis, 10);
+        bytes32 cuhPositionID = Position.getID(cuh, 1);
+        bytes32 dennisPositionID = Position.getID(dennis, 10);
 
         (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(cuhPositionID);
 
@@ -312,8 +312,8 @@ contract MultiUserTest is TestHelper {
         pair.burn(address(this), 1.5 ether, 12 ether, 1.5 ether);
         _mintMaker(1 ether, 8 ether, 1 ether, 1, cuh);
 
-        bytes32 cuhPositionID = Position.getId(cuh, 1);
-        bytes32 dennisPositionID = Position.getId(dennis, 2);
+        bytes32 cuhPositionID = Position.getID(cuh, 1);
+        bytes32 dennisPositionID = Position.getID(dennis, 2);
 
         (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(cuhPositionID);
 
@@ -343,6 +343,8 @@ contract MultiUserTest is TestHelper {
         assertEq(lendgine.currentLiquidity(), 1.5 ether);
         assertEq(lendgine.rewardPerINStored(), 0);
         assertEq(lendgine.lastUpdate(), 1);
+        assertEq(lendgine.totalLiquidityBorrowed(), 1.5 ether);
+        assertEq(lendgine.interestNumerator(), 1.5 ether);
 
         assertEq(pair.totalSupply(), 1.5 ether);
         assertEq(pair.buffer(), 0);
@@ -354,8 +356,8 @@ contract MultiUserTest is TestHelper {
         pair.burn(address(this), 0.5 ether, 4 ether, 0.5 ether);
         _mintMaker(1 ether, 8 ether, 1 ether, 1, dennis);
 
-        bytes32 cuhPositionID = Position.getId(cuh, 2);
-        bytes32 dennisPositionID = Position.getId(dennis, 1);
+        bytes32 cuhPositionID = Position.getID(cuh, 2);
+        bytes32 dennisPositionID = Position.getID(dennis, 1);
 
         (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(cuhPositionID);
 
@@ -396,8 +398,8 @@ contract MultiUserTest is TestHelper {
         _mint(15 ether, address(this));
         _burn(1 ether, address(this));
 
-        bytes32 cuhPositionID = Position.getId(cuh, 1);
-        bytes32 dennisPositionID = Position.getId(dennis, 2);
+        bytes32 cuhPositionID = Position.getID(cuh, 1);
+        bytes32 dennisPositionID = Position.getID(dennis, 2);
 
         (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(cuhPositionID);
 
@@ -431,5 +433,20 @@ contract MultiUserTest is TestHelper {
 
         assertEq(pair.totalSupply(), 2 * 1 ether);
         assertEq(pair.buffer(), 0.5 ether);
+    }
+
+    function testRemoveSharedTick() public {
+        _mintMaker(1 ether, 8 ether, 1 ether, 1, cuh);
+        _mintMaker(1 ether, 8 ether, 1 ether, 1, dennis);
+        _mintMaker(1 ether, 8 ether, 1 ether, 2, dennis);
+        _mint(10 ether, address(this));
+        _burnMaker(0.5 ether, 1, cuh);
+
+        assertEq(lendgine.currentTick(), 1);
+        assertEq(lendgine.currentLiquidity(), 1 ether);
+        assertEq(lendgine.interestNumerator(), 1 ether);
+        assertEq(lendgine.rewardPerINStored(), 0);
+        assertEq(lendgine.lastUpdate(), 1);
+        assertEq(lendgine.totalLiquidityBorrowed(), 1 ether);
     }
 }

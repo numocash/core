@@ -17,8 +17,8 @@ library Tick {
     }
 
     function update(
-        mapping(uint24 => Tick.Info) storage self,
-        uint24 tick,
+        mapping(uint16 => Tick.Info) storage self,
+        uint16 tick,
         int256 liquidityDelta
     ) internal {
         Tick.Info storage info = self[tick];

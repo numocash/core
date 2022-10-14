@@ -38,7 +38,7 @@ contract MintMakerTest is TestHelper {
     }
 
     function testPositionID() public {
-        bytes32 positionID = Position.getId(cuh, 1);
+        bytes32 positionID = Position.getID(cuh, 1);
 
         bytes32 estimate = keccak256(abi.encode(cuh, 1));
 
@@ -48,7 +48,7 @@ contract MintMakerTest is TestHelper {
     function testPositionsInit() public {
         _mintMaker(1 ether, 8 ether, 1 ether, 1, cuh);
 
-        bytes32 positionID = Position.getId(cuh, 1);
+        bytes32 positionID = Position.getID(cuh, 1);
 
         (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(positionID);
 
@@ -74,6 +74,6 @@ contract MintMakerTest is TestHelper {
 
     function testZeroMint() public {
         vm.expectRevert(Lendgine.InsufficientOutputError.selector);
-        lendgine.mintMaker(cuh, 1);
+        lendgine.deposit(cuh, 1);
     }
 }

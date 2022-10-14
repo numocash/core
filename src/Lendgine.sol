@@ -12,6 +12,8 @@ import { Tick } from "./libraries/Tick.sol";
 import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
 import { ERC20 } from "solmate/tokens/ERC20.sol";
 
+import "forge-std/console2.sol";
+
 /// @notice A general purpose funding rate engine
 /// @author Kyle Scott (https://github.com/numoen/core/blob/master/src/Lendgine.sol)
 /// @author Modified from Uniswap (https://github.com/Uniswap/v3-core/blob/main/contracts/UniswapV3Pool.sol)
@@ -20,24 +22,31 @@ contract Lendgine is ERC20 {
     using Position for mapping(bytes32 => Position.Info);
     using Position for Position.Info;
 
-    using Tick for mapping(uint24 => Tick.Info);
+    using Tick for mapping(uint16 => Tick.Info);
     using Tick for Tick.Info;
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
 
-    event Mint(address indexed sender, address indexed to, uint256 amountSpeculative, uint256 amountShares);
+    event Mint(address indexed sender, uint256 amountS, uint256 shares, uint256 liquidity, address indexed to);
 
-    event Burn(address indexed sender, address indexed to, uint256 amountShares, uint256 amountSpeculative);
+    event Burn(address indexed sender, uint256 amountS, uint256 shares, uint256 liquidity, address indexed to);
 
-    event MintMaker(address indexed sender, address indexed to, uint256 amountLP, uint24 tick); // add ticks to events
+    event Deposit(address indexed sender, uint256 liquidity, uint16 tick, address indexed to);
 
-    event BurnMaker(address indexed to, uint256 amountLP, uint24 tick);
+    event Withdraw(address indexed sender, uint256 liquidity, uint16 tick);
 
-    event AccrueInterest();
+    event AccrueInterest(uint256 timeElapsed, uint256 amountS, uint256 liquidity, uint256 rewardPerIN);
 
-    event AccrueMakerInterest();
+    event AccrueTickInterest(uint16 indexed tick, uint256 rewardPerIN, uint256 tokensOwed);
+
+    event AccruePositionInterest(
+        uint16 indexed tick,
+        bytes32 indexed id,
+        uint256 rewardPerLiquidity,
+        uint256 tokensOwed
+    );
 
     event Collect(address indexed owner, address indexed to, uint256 amountBase);
 
@@ -65,6 +74,8 @@ contract Lendgine is ERC20 {
                                IMMUTABLES
     //////////////////////////////////////////////////////////////*/
 
+    uint16 public constant MaxTick = 10_000;
+
     address public immutable factory;
 
     address public immutable pair;
@@ -75,10 +86,7 @@ contract Lendgine is ERC20 {
 
     mapping(bytes32 => Position.Info) public positions;
 
-    mapping(uint24 => Tick.Info) public ticks;
-
-    // tick 0 corresponds to empty
-    uint24 public currentTick;
+    mapping(uint16 => Tick.Info) public ticks;
 
     uint256 public currentLiquidity;
 
@@ -88,7 +96,10 @@ contract Lendgine is ERC20 {
 
     uint256 public rewardPerINStored;
 
-    uint40 public lastUpdate;
+    uint64 public lastUpdate;
+
+    /// @dev tick 0 corresponds to an uninitialized state
+    uint16 public currentTick;
 
     /*//////////////////////////////////////////////////////////////
                            REENTRANCY LOGIC
@@ -117,202 +128,249 @@ contract Lendgine is ERC20 {
     }
 
     /*//////////////////////////////////////////////////////////////
-                            LENDGINE LOGIC
+                            MINT/BURN LOGIC
     //////////////////////////////////////////////////////////////*/
 
     function mint(
-        address recipient,
-        uint256 amountSpeculative,
+        address to,
+        uint256 amountS,
         bytes calldata data
     ) external lock returns (uint256) {
-        _accrueInterest();
+        StateCache memory cache = loadCache();
 
-        if (currentTick == 0) revert CompleteUtilizationError();
+        _accrueInterest(cache);
 
-        // amount of LP to be borrowed
-        uint256 lpAmount = lpForSpeculative(amountSpeculative);
+        if (cache.currentTick == 0) revert CompleteUtilizationError();
 
-        // amount of shares to award the recipient
-        uint256 totalLPAmount = totalLiquidityBorrowed;
-        uint256 _totalSupply = totalSupply;
-        uint256 amountShares = _totalSupply != 0 ? (lpAmount * _totalSupply) / totalLPAmount : lpAmount;
+        uint256 liquidity = convertAssetToLiquidity(amountS);
+        uint256 shares = convertLiquidityToShare(liquidity);
 
-        if (amountShares == 0) revert InsufficientOutputError();
+        if (shares == 0) revert InsufficientOutputError();
 
-        // gather speculative tokens from makers
-        uint256 interestNumeratorDelta = increaseCurrentLiquidity(lpAmount);
-        interestNumerator += interestNumeratorDelta;
-        totalLiquidityBorrowed += lpAmount;
+        increaseCurrentLiquidity(liquidity, cache);
 
-        _mint(recipient, amountShares); // optimistically mint
+        currentTick = cache.currentTick;
+        currentLiquidity = cache.currentLiquidity;
+        interestNumerator = cache.interestNumerator;
+        totalLiquidityBorrowed = cache.totalLiquidityBorrowed + liquidity;
 
-        Pair(pair).addBuffer(lpAmount);
+        _mint(to, shares); // optimistically mint
+        Pair(pair).addBuffer(liquidity);
 
         uint256 balanceBefore = balanceSpeculative();
-        IMintCallback(msg.sender).MintCallback(amountSpeculative, data);
+        IMintCallback(msg.sender).MintCallback(amountS, data);
         uint256 balanceAfter = balanceSpeculative();
+        if (balanceAfter < balanceBefore + amountS) revert InsufficientInputError();
 
-        if (balanceAfter < balanceBefore + amountSpeculative) revert InsufficientInputError();
-
-        emit Mint(msg.sender, recipient, amountSpeculative, amountShares);
-
-        return amountShares;
+        emit Mint(msg.sender, amountS, shares, liquidity, to);
+        return shares;
     }
 
-    function burn(address recipient) external lock {
-        _accrueInterest();
+    function burn(address to) external lock returns (uint256) {
+        StateCache memory cache = loadCache();
 
-        uint256 amountShares = balanceOf[address(this)];
+        _accrueInterest(cache);
 
-        uint256 amountLP = (amountShares * totalLiquidityBorrowed) / totalSupply;
+        uint256 shares = balanceOf[address(this)];
+        uint256 liquidity = convertShareToLiquidity(shares);
+        uint256 amountS = convertLiquidityToAsset(liquidity);
 
-        if (amountLP == 0) revert InsufficientOutputError();
+        if (liquidity == 0) revert InsufficientOutputError();
 
-        uint256 amountSpeculative = speculativeForLP(amountLP);
+        decreaseCurrentLiquidity(liquidity, cache);
 
-        uint256 interestNumeratorDelta = decreaseCurrentLiquidity(amountLP);
+        interestNumerator = cache.interestNumerator;
+        totalLiquidityBorrowed = cache.totalLiquidityBorrowed - liquidity;
+        currentLiquidity = cache.currentLiquidity;
+        currentTick = cache.currentTick;
 
-        interestNumerator -= interestNumeratorDelta;
-        totalLiquidityBorrowed -= amountLP;
+        _burn(address(this), shares);
+        Pair(pair).removeBuffer(liquidity);
+        SafeTransferLib.safeTransfer(ERC20(Pair(pair).speculative()), to, amountS);
 
-        _burn(address(this), amountShares);
-
-        SafeTransferLib.safeTransfer(ERC20(Pair(pair).speculative()), recipient, amountSpeculative);
-
-        Pair(pair).removeBuffer(amountLP);
-
-        emit Burn(msg.sender, recipient, amountShares, amountSpeculative);
-    }
-
-    function mintMaker(address recipient, uint24 tick) external lock {
-        uint256 amountLP = Pair(pair).buffer();
-
-        Position.Info storage position = positions.get(recipient, tick);
-        bytes32 id = Position.getId(recipient, tick);
-
-        if (amountLP == 0) revert InsufficientOutputError();
-        if (tick == 0) revert InvalidTick();
-
-        // trigger accruals if current position is utilized
-        {
-            bool utilized = (currentTick == tick && currentLiquidity > 0) || (tick < currentTick);
-
-            if (utilized) {
-                _accrueInterest();
-                if (tick != currentTick) _accrueTickInterest(tick);
-                _accrueMakerInterest(id, tick);
-            }
-        }
-
-        ticks.update(tick, int256(amountLP));
-        position.update(int256(amountLP));
-
-        // remove liquidity if we bumped someone out
-        if (tick < currentTick) {
-            // TODO: update interestNumerator
-            decreaseCurrentLiquidity(amountLP);
-        }
-
-        if (currentTick == 0) {
-            currentTick = tick;
-        }
-
-        Pair(pair).removeBuffer(amountLP);
-
-        emit MintMaker(msg.sender, recipient, amountLP, tick);
-    }
-
-    function burnMaker(uint24 tick, uint256 amountLP) external lock {
-        if (tick == 0) revert InvalidTick();
-
-        Position.Info storage position = positions.get(msg.sender, tick);
-        bytes32 id = Position.getId(msg.sender, tick);
-
-        bool utilized = (currentTick == tick && currentLiquidity > 0) || (tick < currentTick);
-
-        if (utilized) {
-            _accrueInterest();
-            if (tick != currentTick) _accrueTickInterest(tick);
-            _accrueMakerInterest(id, tick);
-        }
-
-        if (amountLP == 0) revert InsufficientOutputError();
-
-        uint256 utilizedLP;
-
-        if (tick == currentTick) {
-            if (currentLiquidity > position.liquidity - amountLP) {
-                utilizedLP = currentLiquidity - (position.liquidity - amountLP);
-            }
-
-            if (amountLP == position.liquidity) {
-                // if fully removing position
-                // TODO: write to stack instead
-                currentLiquidity = 0;
-            }
-        } else if (tick < currentTick) {
-            utilizedLP = amountLP;
-        }
-
-        if (amountLP == 0) revert InsufficientOutputError();
-        if (amountLP > position.liquidity) revert InsufficientPositionError();
-
-        // Remove position from the data structure
-        // if tick needs to advance to the next tick
-        if (currentTick == tick && currentLiquidity > position.liquidity - amountLP) {
-            currentLiquidity = position.liquidity - amountLP;
-        }
-
-        ticks.update(tick, -int256(amountLP));
-        position.update(-int256(amountLP));
-
-        // Replace if we removed utilized liquidity
-        if (utilizedLP > 0) {
-            // TODO: update interestNumerator
-            increaseCurrentLiquidity(utilizedLP);
-        }
-
-        Pair(pair).addBuffer(amountLP);
-
-        emit BurnMaker(msg.sender, amountLP, tick);
-    }
-
-    function accrueInterest() external lock {
-        _accrueInterest();
-    }
-
-    function accrueTickInterest(uint24 tick) external lock {
-        if (tick == 0) revert InvalidTick();
-        _accrueInterest();
-        if (tick != currentTick) _accrueTickInterest(tick);
-    }
-
-    function accrueMakerInterest(bytes32 id, uint24 tick) external lock {
-        if (tick == 0) revert InvalidTick();
-
-        _accrueInterest();
-        if (tick != currentTick) _accrueTickInterest(tick);
-        _accrueMakerInterest(id, tick);
-    }
-
-    function collectMaker(address recipient, uint24 tick) external lock returns (uint256 collectedTokens) {
-        if (tick == 0) revert InvalidTick();
-
-        Position.Info storage position = positions.get(msg.sender, tick);
-
-        collectedTokens = position.tokensOwed;
-
-        if (collectedTokens == 0) revert InsufficientOutputError();
-
-        position.tokensOwed = 0;
-
-        SafeTransferLib.safeTransfer(ERC20(Pair(pair).speculative()), recipient, collectedTokens);
-
-        emit Collect(msg.sender, recipient, collectedTokens);
+        emit Burn(msg.sender, amountS, shares, liquidity, to);
+        return amountS;
     }
 
     /*//////////////////////////////////////////////////////////////
-                                VIEW
+                        DEPOSIT/WITHDRAWAL LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function deposit(address to, uint16 tick) external lock {
+        StateCache memory cache = loadCache();
+
+        uint256 liquidity = Pair(pair).buffer();
+
+        if (liquidity == 0) revert InsufficientOutputError();
+        if (tick == 0 || tick > MaxTick) revert InvalidTick();
+
+        bytes32 id = Position.getID(to, tick);
+
+        bool utilized = (cache.currentTick == tick && cache.currentLiquidity > 0) || (tick < cache.currentTick);
+        if (utilized) {
+            _accrueInterest(cache);
+            if (tick != cache.currentTick) _accrueTickInterest(tick);
+            _accruePositionInterest(id, tick);
+        }
+
+        ticks.update(tick, int256(liquidity));
+        positions.update(id, int256(liquidity));
+
+        if (tick < cache.currentTick) {
+            cache.interestNumerator += liquidity * tick;
+
+            decreaseCurrentLiquidity(liquidity, cache);
+
+            interestNumerator = cache.interestNumerator;
+            currentLiquidity = cache.currentLiquidity;
+            currentTick = cache.currentTick;
+        } else if (cache.currentTick == 0) {
+            currentTick = tick;
+        }
+
+        Pair(pair).removeBuffer(liquidity);
+        emit Deposit(msg.sender, liquidity, tick, to);
+    }
+
+    function withdraw(uint16 tick, uint256 liquidity) external lock {
+        StateCache memory cache = loadCache();
+
+        if (liquidity == 0) revert InsufficientOutputError();
+        if (tick == 0) revert InvalidTick();
+
+        bytes32 id = Position.getID(msg.sender, tick);
+        Position.Info memory positionInfo = positions.get(msg.sender, tick);
+        Tick.Info memory tickInfo = ticks[tick];
+
+        if (liquidity > positionInfo.liquidity) revert InsufficientPositionError();
+
+        if ((cache.currentTick == tick && cache.currentLiquidity > 0) || (tick < cache.currentTick)) {
+            _accrueInterest(cache);
+            if (tick != cache.currentTick) _accrueTickInterest(tick);
+            _accruePositionInterest(id, tick);
+        }
+
+        uint256 utilizedLiquidity = 0;
+        uint256 remainingLiquidity = tickInfo.liquidity - liquidity;
+        if (tick < cache.currentTick) {
+            utilizedLiquidity = liquidity;
+        } else if (tick == cache.currentTick && cache.currentLiquidity > remainingLiquidity) {
+            utilizedLiquidity = cache.currentLiquidity - remainingLiquidity;
+
+            cache.currentTick += 1;
+            cache.currentLiquidity = 0;
+        }
+
+        // Remove position from the data structure
+        ticks.update(tick, -int256(liquidity));
+        positions.update(id, -int256(liquidity));
+
+        // Replace if we removed utilized liquidity
+        if (utilizedLiquidity > 0) {
+            cache.interestNumerator -= utilizedLiquidity * tick;
+
+            increaseCurrentLiquidity(utilizedLiquidity, cache);
+
+            currentTick = cache.currentTick;
+            currentLiquidity = cache.currentLiquidity;
+            interestNumerator = cache.interestNumerator;
+        }
+
+        Pair(pair).addBuffer(liquidity);
+        emit Withdraw(msg.sender, liquidity, tick);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            INTEREST LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function accrueInterest() external lock {
+        StateCache memory cache = loadCache();
+        _accrueInterest(cache);
+    }
+
+    function accrueTickInterest(uint16 tick) external lock {
+        if (tick == 0) revert InvalidTick();
+        StateCache memory cache = loadCache();
+
+        _accrueInterest(cache);
+        if (tick != currentTick) _accrueTickInterest(tick);
+    }
+
+    function accruePositionInterest(uint16 tick) external lock {
+        if (tick == 0) revert InvalidTick();
+
+        bytes32 id = Position.getID(msg.sender, tick);
+        StateCache memory cache = loadCache();
+
+        _accrueInterest(cache);
+        if (tick != currentTick) _accrueTickInterest(tick);
+        _accruePositionInterest(id, tick);
+    }
+
+    function collect(
+        address to,
+        uint16 tick,
+        uint256 amountSRequested
+    ) external lock returns (uint256 amountS) {
+        if (tick == 0) revert InvalidTick();
+
+        Position.Info storage position = positions.get(msg.sender, tick);
+
+        amountS = amountSRequested > position.tokensOwed ? position.tokensOwed : amountSRequested;
+
+        if (amountS > 0) {
+            position.tokensOwed -= amountS;
+            SafeTransferLib.safeTransfer(ERC20(Pair(pair).speculative()), to, amountS);
+        }
+
+        emit Collect(msg.sender, to, amountS);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            ACCOUNTING LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function convertLiquidityToShare(uint256 liquidity) public view returns (uint256) {
+        uint256 _totalLiquidityBorrowed = totalLiquidityBorrowed;
+        return _totalLiquidityBorrowed == 0 ? liquidity : (liquidity * totalSupply) / _totalLiquidityBorrowed;
+    }
+
+    function convertShareToLiquidity(uint256 shares) public view returns (uint256) {
+        return (totalLiquidityBorrowed * shares) / totalSupply;
+    }
+
+    function convertAssetToLiquidity(uint256 assets) public view returns (uint256) {
+        return (assets * 10**18) / (2 * Pair(pair).upperBound());
+    }
+
+    function convertLiquidityToAsset(uint256 liquidity) public view returns (uint256) {
+        return (2 * liquidity * Pair(pair).upperBound()) / 10**18;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                             STATE CACHE
+    //////////////////////////////////////////////////////////////*/
+
+    struct StateCache {
+        uint256 currentLiquidity;
+        uint256 interestNumerator;
+        uint256 totalLiquidityBorrowed;
+        uint16 currentTick;
+    }
+
+    function loadCache() private view returns (StateCache memory) {
+        return
+            StateCache({
+                currentTick: currentTick,
+                currentLiquidity: currentLiquidity,
+                interestNumerator: interestNumerator,
+                totalLiquidityBorrowed: totalLiquidityBorrowed
+            });
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                                 VIEW
     //////////////////////////////////////////////////////////////*/
 
     function balanceSpeculative() public view returns (uint256) {
@@ -327,105 +385,96 @@ contract Lendgine is ERC20 {
         return abi.decode(data, (uint256));
     }
 
-    function speculativeForLP(uint256 _lpAmount) public view returns (uint256) {
-        return (2 * _lpAmount * Pair(pair).upperBound()) / 10**18;
+    /*//////////////////////////////////////////////////////////////
+                         INTERNAL LIQUIDITY LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function increaseCurrentLiquidity(uint256 liquidity, StateCache memory cache) private view {
+        Tick.Info memory currentTickInfo = ticks[cache.currentTick];
+
+        // amount of liquidity in this tick available
+        uint256 remainingCurrentLiquidity = currentTickInfo.liquidity - cache.currentLiquidity;
+        // amount of pair lp tokens to be added
+        uint256 remainingLP = liquidity;
+
+        while (true) {
+            if (remainingCurrentLiquidity >= remainingLP) {
+                break;
+            } else {
+                if (cache.currentTick == MaxTick) revert CompleteUtilizationError();
+
+                cache.interestNumerator += cache.currentTick * remainingCurrentLiquidity;
+                cache.currentTick += 1;
+
+                currentTickInfo = ticks[cache.currentTick];
+                remainingLP -= remainingCurrentLiquidity;
+                remainingCurrentLiquidity = currentTickInfo.liquidity;
+            }
+        }
+
+        cache.interestNumerator += cache.currentTick * remainingLP;
+        cache.currentLiquidity += remainingLP;
     }
 
-    function lpForSpeculative(uint256 _speculativeAmount) public view returns (uint256) {
-        return (_speculativeAmount * 1 ether) / (2 * Pair(pair).upperBound());
+    function decreaseCurrentLiquidity(uint256 liquidity, StateCache memory cache) private {
+        Tick.Info memory currentTickInfo = ticks[cache.currentTick];
+
+        uint256 remainingCurrentLiquidity = cache.currentLiquidity;
+        uint256 remainingLP = liquidity;
+
+        while (true) {
+            if (remainingCurrentLiquidity >= remainingLP) {
+                break;
+            } else {
+                cache.interestNumerator -= cache.currentTick * remainingCurrentLiquidity;
+                cache.currentTick -= 1; // should never underflow
+
+                currentTickInfo = ticks[cache.currentTick];
+                remainingLP -= remainingCurrentLiquidity;
+                remainingCurrentLiquidity = currentTickInfo.liquidity;
+
+                _accrueTickInterest(cache.currentTick);
+            }
+        }
+        cache.interestNumerator -= cache.currentTick * remainingLP;
+        cache.currentLiquidity = remainingCurrentLiquidity - remainingLP;
     }
 
     /*//////////////////////////////////////////////////////////////
-                            INTERNAL LOGIC
+                         INTERNAL INTEREST LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev Current position is assumed to be valid
-    function increaseCurrentLiquidity(uint256 amountLP) private returns (uint256 interestNumeratorDelta) {
-        uint24 _currentTick = currentTick;
-        Tick.Info memory currentTickInfo = ticks[_currentTick];
-
-        // amount of speculative in this tick available
-        uint256 remainingCurrentLiquidity = currentTickInfo.liquidity - currentLiquidity;
-        uint256 remainingLP = amountLP; // amount of pair lp tokens to be added
-
-        while (true) {
-            if (remainingCurrentLiquidity >= remainingLP) {
-                break;
-            } else {
-                interestNumeratorDelta += _currentTick * remainingCurrentLiquidity;
-
-                _currentTick = _currentTick + 1;
-                currentLiquidity = 0;
-                // TODO: error when max tick is reached
-                currentTickInfo = ticks[_currentTick];
-
-                remainingLP -= remainingCurrentLiquidity;
-                remainingCurrentLiquidity = currentTickInfo.liquidity;
-            }
-        }
-
-        interestNumeratorDelta += _currentTick * remainingLP;
-        currentTick = _currentTick;
-        currentLiquidity += remainingLP;
-    }
-
-    /// @dev assumed to never decrease past zero
-    function decreaseCurrentLiquidity(uint256 amountLP) private returns (uint256 interestNumeratorDelta) {
-        uint24 _currentTick = currentTick;
-        Tick.Info memory currentTickInfo = ticks[_currentTick];
-
-        uint256 remainingCurrentLiquidity = currentLiquidity;
-        uint256 remainingLP = amountLP;
-
-        while (true) {
-            if (remainingCurrentLiquidity >= remainingLP) {
-                break;
-            } else {
-                interestNumeratorDelta += _currentTick * remainingCurrentLiquidity;
-
-                // should never underflow
-                _currentTick = _currentTick - 1;
-                currentTickInfo = ticks[_currentTick];
-
-                remainingLP -= remainingCurrentLiquidity;
-                remainingCurrentLiquidity = currentTickInfo.liquidity;
-                _accrueTickInterest(_currentTick);
-            }
-        }
-
-        interestNumeratorDelta += _currentTick * remainingLP;
-        currentTick = _currentTick;
-        currentLiquidity = remainingCurrentLiquidity - remainingLP;
-    }
-
-    function _accrueInterest() private {
+    function _accrueInterest(StateCache memory cache) private {
         if (totalSupply == 0) {
-            lastUpdate = uint40(block.timestamp);
+            lastUpdate = uint64(block.timestamp);
             return;
         }
 
         uint256 timeElapsed = block.timestamp - lastUpdate;
-        if (timeElapsed == 0 || interestNumerator == 0) return;
+        if (timeElapsed == 0 || cache.interestNumerator == 0) return;
 
-        // calculate how much must be removed
-        uint256 dilutionLP = (interestNumerator * timeElapsed) / (1 days * 10_000);
-        uint256 dilutionSpeculative = speculativeForLP(dilutionLP);
+        uint256 dilutionLPRequested = (cache.interestNumerator * timeElapsed) / (1 days * 10_000);
+        uint256 dilutionLP = dilutionLPRequested > cache.totalLiquidityBorrowed
+            ? cache.totalLiquidityBorrowed
+            : dilutionLPRequested;
 
-        rewardPerINStored += (dilutionSpeculative * 1 ether) / interestNumerator;
+        uint256 dilutionSpeculative = convertLiquidityToAsset(dilutionLP);
+        rewardPerINStored += (dilutionSpeculative * 1 ether) / cache.interestNumerator;
 
         _accrueTickInterest(currentTick);
 
-        uint256 interestNumeratorDelta = decreaseCurrentLiquidity(dilutionLP);
-        totalLiquidityBorrowed -= dilutionLP;
-        interestNumerator -= interestNumeratorDelta;
+        decreaseCurrentLiquidity(dilutionLP, cache);
 
-        // TODO: dilution > baseReserves;
-        lastUpdate = uint40(block.timestamp);
+        totalLiquidityBorrowed = cache.totalLiquidityBorrowed - dilutionLP;
+        interestNumerator = cache.interestNumerator;
+        currentLiquidity = cache.currentLiquidity;
+        currentTick = cache.currentTick;
+        lastUpdate = uint64(block.timestamp);
 
-        emit AccrueInterest();
+        emit AccrueInterest(timeElapsed, dilutionSpeculative, dilutionLP, rewardPerINStored);
     }
 
-    function _accrueTickInterest(uint24 tick) private {
+    function _accrueTickInterest(uint16 tick) private {
         if (tick > currentTick) revert UnutilizedAccrueError();
 
         Tick.Info storage tickInfo = ticks[tick];
@@ -439,12 +488,11 @@ contract Lendgine is ERC20 {
                 _tickInfo.tokensOwedPerLiquidity +
                 ((tokensOwed * 1 ether) / _tickInfo.liquidity);
 
-        emit AccrueMakerInterest();
+        emit AccrueTickInterest(tick, rewardPerINStored, tokensOwed);
     }
 
     /// @dev assume global interest accrual is up to date
-    function _accrueMakerInterest(bytes32 id, uint24 tick) private {
-        // TODO: assert tick is matched with correct id
+    function _accruePositionInterest(bytes32 id, uint16 tick) private {
         Position.Info storage position = positions[id];
         Position.Info memory _position = position;
 
@@ -453,28 +501,28 @@ contract Lendgine is ERC20 {
 
         uint256 tokensOwed = newTokensOwed(_position, _tickInfo);
 
-        position.rewardPerLiquidityPaid = tickInfo.tokensOwedPerLiquidity;
+        position.rewardPerLiquidityPaid = _tickInfo.tokensOwedPerLiquidity;
         position.tokensOwed = _position.tokensOwed + tokensOwed;
 
-        emit AccrueMakerInterest();
+        emit AccruePositionInterest(tick, id, _tickInfo.tokensOwedPerLiquidity, tokensOwed);
     }
 
     /// @dev Assumes reward per token stored is up to date
-    function newTokensOwed(Tick.Info memory tickInfo, uint24 tick) private view returns (uint256) {
+    function newTokensOwed(Tick.Info memory tickInfo, uint16 tick) private view returns (uint256) {
         if (tick > currentTick) return 0;
+
         uint256 liquidity = tickInfo.liquidity;
         if (currentTick == tick) {
             liquidity = currentLiquidity;
         }
-        uint256 owed = (liquidity * tick * (rewardPerINStored - tickInfo.rewardPerINPaid)) / 1 ether;
-        return owed;
+
+        return (liquidity * tick * (rewardPerINStored - tickInfo.rewardPerINPaid)) / 1 ether;
     }
 
     /// @dev Assumes reward per token stored is up to date
     function newTokensOwed(Position.Info memory position, Tick.Info memory tickInfo) private pure returns (uint256) {
         uint256 liquidity = position.liquidity;
 
-        uint256 owed = (liquidity * (tickInfo.tokensOwedPerLiquidity - position.rewardPerLiquidityPaid)) / (1 ether);
-        return owed;
+        return (liquidity * (tickInfo.tokensOwedPerLiquidity - position.rewardPerLiquidityPaid)) / (1 ether);
     }
 }

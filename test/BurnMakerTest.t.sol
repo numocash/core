@@ -19,7 +19,7 @@ contract BurnMakerTest is TestHelper {
 
         _mintMaker(1 ether, 8 ether, 1 ether, 1, cuh);
 
-        positionID = Position.getId(cuh, 1);
+        positionID = Position.getID(cuh, 1);
     }
 
     function testBurnMakerPartial() public {
@@ -75,7 +75,7 @@ contract BurnMakerTest is TestHelper {
 
     function testZeroBurn() public {
         vm.expectRevert(Lendgine.InsufficientOutputError.selector);
-        lendgine.burnMaker(1, 0 ether);
+        lendgine.withdraw(1, 0 ether);
     }
 
     // function testOverBurn() public {

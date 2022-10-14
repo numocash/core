@@ -21,7 +21,7 @@ contract BurnTest is TestHelper {
 
         _mint(10 ether, cuh);
 
-        positionID = Position.getId(cuh, 1);
+        positionID = Position.getID(cuh, 1);
     }
 
     function testBurnPartial() public {
@@ -88,7 +88,7 @@ contract BurnTest is TestHelper {
 
         // Test global storage values
         assertEq(lendgine.currentTick(), 1);
-        assertEq(lendgine.currentLiquidity(), 0 ether);
+        assertEq(lendgine.currentLiquidity(), 0);
         assertEq(lendgine.rewardPerINStored(), 0);
         assertEq(lendgine.lastUpdate(), 1);
         assertEq(lendgine.interestNumerator(), 0);

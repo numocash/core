@@ -63,12 +63,12 @@ abstract contract TestHelper is Test, CallbackHelper {
         uint256 amountBase,
         uint256 amountSpeculative,
         uint256 liquidity,
-        uint24 tick,
+        uint16 tick,
         address spender
     ) internal {
         _pairMint(amountBase, amountSpeculative, liquidity, spender);
 
-        lendgine.mintMaker(spender, tick);
+        lendgine.deposit(spender, tick);
     }
 
     function _pairMint(
@@ -93,11 +93,11 @@ abstract contract TestHelper is Test, CallbackHelper {
 
     function _burnMaker(
         uint256 amountLP,
-        uint24 tick,
+        uint16 tick,
         address spender
     ) internal {
         vm.prank(spender);
-        lendgine.burnMaker(tick, amountLP);
+        lendgine.withdraw(tick, amountLP);
     }
 
     function _mint(uint256 amount, address spender) internal {

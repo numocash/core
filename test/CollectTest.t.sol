@@ -20,23 +20,19 @@ contract CollectTest is TestHelper {
         _mintMaker(1 ether, 8 ether, 1 ether, 1, cuh);
         _mint(1 ether, cuh);
 
-        positionID = Position.getId(cuh, 1);
-    }
-
-    function testZeroCollect() public {
-        vm.expectRevert(Lendgine.InsufficientOutputError.selector);
-        lendgine.collectMaker(cuh, 1);
+        positionID = Position.getID(cuh, 1);
     }
 
     function testCollect() public {
         vm.warp(1 days + 1);
 
-        lendgine.accrueMakerInterest(positionID, 1);
+        vm.prank(cuh);
+        lendgine.accruePositionInterest(1);
 
         uint256 dilution = 0.1 ether / 10000;
 
         vm.prank(cuh);
-        lendgine.collectMaker(cuh, 1);
+        lendgine.collect(cuh, 1, (dilution * 10));
 
         // Test lendgine token
         assertEq(lendgine.totalSupply(), 0.1 ether);

@@ -3,10 +3,9 @@ pragma solidity ^0.8.4;
 
 import { LiquidityMath } from "./LiquidityMath.sol";
 
-/// @notice Library for handling Lendgine Maker positions
+/// @notice Library for handling Lendgine liquidity positions
 /// @author Kyle Scott (https://github.com/kyscott18/kyleswap2.5/blob/main/src/ERC20.sol)
 /// @author Modified from Uniswap (https://github.com/transmissions11/solmate/blob/main/src/tokens/ERC20.sol)
-/// @dev Implements a doubley linked list
 library Position {
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
@@ -28,13 +27,16 @@ library Position {
                               POSITION LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev -liquidityDelta should not equal self.liquidity
-    function update(Info storage self, int256 liquidityDelta) internal {
-        Info memory _self = self;
+    function update(
+        mapping(bytes32 => Position.Info) storage self,
+        bytes32 id,
+        int256 liquidityDelta
+    ) internal {
+        Position.Info storage info = self[id];
 
         if (liquidityDelta == 0) revert NoLiquidityError();
 
-        self.liquidity = LiquidityMath.addDelta(_self.liquidity, liquidityDelta);
+        info.liquidity = LiquidityMath.addDelta(info.liquidity, liquidityDelta);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -44,12 +46,12 @@ library Position {
     function get(
         mapping(bytes32 => Info) storage self,
         address owner,
-        uint24 tick
+        uint16 tick
     ) internal view returns (Position.Info storage position) {
-        position = self[getId(owner, tick)];
+        position = self[getID(owner, tick)];
     }
 
-    function getId(address owner, uint24 tick) internal pure returns (bytes32 id) {
+    function getID(address owner, uint16 tick) internal pure returns (bytes32 id) {
         id = keccak256(abi.encode(owner, tick));
     }
 }
