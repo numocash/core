@@ -123,7 +123,6 @@ contract Pair {
         emit Mint(msg.sender, liquidity);
     }
 
-    // TODO: is it possible to recover donated funds?
     function burn(
         address to,
         uint256 amount0,

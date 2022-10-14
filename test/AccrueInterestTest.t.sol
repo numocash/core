@@ -122,7 +122,7 @@ contract AccrueInterestTest is TestHelper {
 
     function testMaxAccrue() public {
         _burnMaker(1 ether, 1, cuh);
-        pair.burn(cuh);
+        pair.burn(cuh, 1 ether, 8 ether, 1 ether);
         _mintMaker(1 ether, 8 ether, 1 ether, 10_000, cuh);
         _mint(1 ether, cuh);
 
