@@ -139,7 +139,7 @@
 //     }
 
 //     function testDouble() public {
-//         _mintMaker(1 ether, 8 ether, 1 ether, 1, cuh);
+//         _deposit(1 ether, 8 ether, 1 ether, 1, cuh);
 //         _pairMint(1_000_000, 8_000_000, 1_000_000, dennis);
 
 //         assertEq(pair.totalSupply(), 1 ether + 1_000_000);
@@ -153,7 +153,7 @@
 //         assertEq(pair.buffer(), 0);
 //         assertEq(pair.totalSupply(), 1 ether);
 
-//         _burnMaker(1 ether, 1, cuh);
+//         _withdraw(1 ether, 1, cuh);
 
 //         assertEq(pair.buffer(), 1 ether);
 //         assertEq(pair.totalSupply(), 1 ether);
@@ -299,7 +299,7 @@
 //     }
 
 //     function testBurnDoubleWithDonation() public {
-//         _mintMaker(9 ether, 4 ether, 1 ether, 1, cuh);
+//         _deposit(9 ether, 4 ether, 1 ether, 1, cuh);
 
 //         base.mint(address(pair), 9 ether);
 //         speculative.mint(address(pair), 4 ether);
@@ -314,7 +314,7 @@
 //         assertEq(pair.totalSupply(), 1 ether);
 //         assertEq(pair.buffer(), 0);
 
-//         _burnMaker(1 ether, 1, cuh);
+//         _withdraw(1 ether, 1, cuh);
 
 //         assertEq(pair.buffer(), 1 ether);
 //         assertEq(pair.totalSupply(), 1 ether);

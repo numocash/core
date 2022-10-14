@@ -34,10 +34,12 @@ library TickBitMaps {
         }
     }
 
+    /// @dev this is only called if there is a tick below
     function below(TickBitMap storage self, uint16 tick) internal view returns (uint16 tickBelow) {
         (uint8 blockIdx, uint8 bitIdx) = position(tick);
         uint256 bit = self.blocks[blockIdx] & ((1 << bitIdx) - 1);
 
+        // if there are no utilized ticks in the current block
         if (bit == 0) {
             uint256 _block = self.blockMap & ((1 << blockIdx) - 1);
             if (_block == 0) return 0;
@@ -55,7 +57,7 @@ library TickBitMaps {
     /// @return r the index of the most significant bit
     function _msb(uint256 x) internal pure returns (uint8 r) {
         unchecked {
-            // assert(x > 0);
+            assert(x > 0);
             if (x >= 0x100000000000000000000000000000000) {
                 x >>= 128;
                 r += 128;

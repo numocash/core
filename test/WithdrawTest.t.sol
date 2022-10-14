@@ -7,6 +7,7 @@ import { CallbackHelper } from "./utils/CallbackHelper.sol";
 
 import { LendgineAddress } from "../src/libraries/LendgineAddress.sol";
 import { Position } from "../src/libraries/Position.sol";
+import { Tick } from "../src/libraries/Tick.sol";
 
 import { Factory } from "../src/Factory.sol";
 import { Lendgine } from "../src/Lendgine.sol";
@@ -29,27 +30,13 @@ contract WithdrawTest is TestHelper {
 
         assertEq(pair.totalSupply(), 1 ether);
 
-        (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(positionID);
+        assertPosition(Position.Info({ liquidity: 0.5 ether, rewardPerLiquidityPaid: 0, tokensOwed: 0 }), positionID);
+        assertTick(
+            Tick.Info({ liquidity: 0.5 ether, rewardPerINPaid: 0, tokensOwedPerLiquidity: 0, prev: 0, next: 0 }),
+            1
+        );
 
-        assertEq(liquidity, 0.5 ether);
-        assertEq(rewardPerLiquidityPaid, 0);
-        assertEq(tokensOwed, 0);
-
-        (
-            uint256 tickLiquidity,
-            uint256 rewardPerINPaid,
-            uint256 tokensOwedPerLiquidity,
-            uint16 prev,
-            uint16 next
-        ) = lendgine.ticks(1);
-
-        assertEq(tickLiquidity, 0.5 ether);
-        assertEq(rewardPerINPaid, 0);
-        assertEq(tokensOwedPerLiquidity, 0);
-        assertEq(prev, 0);
-        assertEq(next, 0);
-
-        assertEq(lendgine.currentTick(), 1);
+        assertEq(lendgine.currentTick(), 0);
         assertEq(lendgine.currentLiquidity(), 0);
         assertEq(lendgine.rewardPerINStored(), 0);
         assertEq(lendgine.lastUpdate(), 0);
@@ -62,27 +49,11 @@ contract WithdrawTest is TestHelper {
         assertEq(pair.buffer(), 1 ether);
         assertEq(pair.totalSupply(), 1 ether);
 
-        (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(positionID);
+        assertPosition(Position.Info({ liquidity: 0, rewardPerLiquidityPaid: 0, tokensOwed: 0 }), positionID);
 
-        assertEq(liquidity, 0 ether);
-        assertEq(rewardPerLiquidityPaid, 0);
-        assertEq(tokensOwed, 0);
+        assertTick(Tick.Info({ liquidity: 0, rewardPerINPaid: 0, tokensOwedPerLiquidity: 0, prev: 0, next: 0 }), 1);
 
-        (
-            uint256 tickLiquidity,
-            uint256 rewardPerINPaid,
-            uint256 tokensOwedPerLiquidity,
-            uint16 prev,
-            uint16 next
-        ) = lendgine.ticks(1);
-
-        assertEq(tickLiquidity, 0 ether);
-        assertEq(rewardPerINPaid, 0);
-        assertEq(tokensOwedPerLiquidity, 0);
-        assertEq(prev, 0);
-        assertEq(next, 0);
-
-        assertEq(lendgine.currentTick(), 1);
+        assertEq(lendgine.currentTick(), 0);
         assertEq(lendgine.currentLiquidity(), 0);
         assertEq(lendgine.rewardPerINStored(), 0);
         assertEq(lendgine.lastUpdate(), 0);
@@ -96,6 +67,6 @@ contract WithdrawTest is TestHelper {
 
     // function testOverBurn() public {
     //     vm.expectRevert(Lendgine.InsufficientPositionError.selector);
-    //     _burnMaker(2 ether, 1, cuh);
+    //     _withdraw(2 ether, 1, cuh);
     // }
 }
