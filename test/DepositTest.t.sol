@@ -11,7 +11,7 @@ import { Factory } from "../src/Factory.sol";
 import { Lendgine } from "../src/Lendgine.sol";
 import { CallbackHelper } from "./utils/CallbackHelper.sol";
 
-contract MintMakerTest is TestHelper {
+contract DepositTest is TestHelper {
     function setUp() public {
         _setUp();
     }
@@ -46,7 +46,7 @@ contract MintMakerTest is TestHelper {
     }
 
     function testPositionsInit() public {
-        _mintMaker(1 ether, 8 ether, 1 ether, 1, cuh);
+        _deposit(1 ether, 8 ether, 1 ether, 1, cuh);
 
         bytes32 positionID = Position.getID(cuh, 1);
 
@@ -56,11 +56,19 @@ contract MintMakerTest is TestHelper {
         assertEq(rewardPerLiquidityPaid, 0);
         assertEq(tokensOwed, 0);
 
-        (uint256 tickLiquidity, uint256 rewardPerINPaid, uint256 tokensOwedPerLiquidity) = lendgine.ticks(1);
+        (
+            uint256 tickLiquidity,
+            uint256 rewardPerINPaid,
+            uint256 tokensOwedPerLiquidity,
+            uint16 prev,
+            uint16 next
+        ) = lendgine.ticks(1);
 
         assertEq(tickLiquidity, 1 ether);
         assertEq(rewardPerINPaid, 0);
         assertEq(tokensOwedPerLiquidity, 0);
+        assertEq(prev, 0);
+        assertEq(next, 0);
 
         assertEq(lendgine.currentTick(), 1);
         assertEq(lendgine.currentLiquidity(), 0);

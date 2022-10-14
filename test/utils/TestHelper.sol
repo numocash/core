@@ -59,7 +59,7 @@ abstract contract TestHelper is Test, CallbackHelper {
         pair = Pair(_pair);
     }
 
-    function _mintMaker(
+    function _deposit(
         uint256 amountBase,
         uint256 amountSpeculative,
         uint256 liquidity,
@@ -96,7 +96,7 @@ abstract contract TestHelper is Test, CallbackHelper {
         );
     }
 
-    function _burnMaker(
+    function _withdraw(
         uint256 amountLP,
         uint16 tick,
         address spender

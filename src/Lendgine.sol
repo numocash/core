@@ -8,6 +8,8 @@ import { IMintCallback } from "./interfaces/IMintCallback.sol";
 
 import { Position } from "./libraries/Position.sol";
 import { Tick } from "./libraries/Tick.sol";
+import { TickBitMaps } from "./libraries/TickBitMaps.sol";
+import { LiquidityMath } from "./libraries/LiquidityMath.sol";
 
 import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
 import { ERC20 } from "solmate/tokens/ERC20.sol";
@@ -21,9 +23,9 @@ import "forge-std/console2.sol";
 contract Lendgine is ERC20 {
     using Position for mapping(bytes32 => Position.Info);
     using Position for Position.Info;
-
     using Tick for mapping(uint16 => Tick.Info);
     using Tick for Tick.Info;
+    using TickBitMaps for TickBitMaps.TickBitMap;
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -87,6 +89,8 @@ contract Lendgine is ERC20 {
     mapping(bytes32 => Position.Info) public positions;
 
     mapping(uint16 => Tick.Info) public ticks;
+
+    TickBitMaps.TickBitMap public tickBitMap;
 
     uint256 public currentLiquidity;
 
@@ -213,7 +217,7 @@ contract Lendgine is ERC20 {
             _accruePositionInterest(id, tick);
         }
 
-        ticks.update(tick, int256(liquidity));
+        updateTick(tick, int256(liquidity));
         positions.update(id, int256(liquidity));
 
         if (tick < cache.currentTick) {
@@ -257,12 +261,12 @@ contract Lendgine is ERC20 {
         } else if (tick == cache.currentTick && cache.currentLiquidity > remainingLiquidity) {
             utilizedLiquidity = cache.currentLiquidity - remainingLiquidity;
 
-            cache.currentTick += 1;
+            cache.currentTick = tickInfo.next;
             cache.currentLiquidity = 0;
         }
 
         // Remove position from the data structure
-        ticks.update(tick, -int256(liquidity));
+        updateTick(tick, -int256(liquidity));
         positions.update(id, -int256(liquidity));
 
         // Replace if we removed utilized liquidity
@@ -389,6 +393,36 @@ contract Lendgine is ERC20 {
                          INTERNAL LIQUIDITY LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    function updateTick(uint16 tick, int256 liquidityDelta) private {
+        Tick.Info storage info = ticks[tick];
+
+        bool init = info.liquidity == 0;
+        info.liquidity = LiquidityMath.addDelta(info.liquidity, liquidityDelta);
+        bool uninit = info.liquidity == 0;
+
+        if (init) {
+            uint16 below = tickBitMap.below(tick);
+            if (below != 0) {
+                uint16 above = ticks[below].next;
+                console2.log("insert", tick, below, above);
+                info.prev = below;
+                info.next = above;
+                ticks[below].next = tick;
+                ticks[above].prev = tick;
+            }
+
+            tickBitMap.flipTick(tick, true);
+        } else if (uninit) {
+            uint16 below = info.prev;
+            uint16 above = info.next;
+            ticks[below].next = above;
+            ticks[above].prev = below;
+
+            tickBitMap.flipTick(tick, false);
+            delete ticks[tick];
+        }
+    }
+
     function increaseCurrentLiquidity(uint256 liquidity, StateCache memory cache) private view {
         Tick.Info memory currentTickInfo = ticks[cache.currentTick];
 
@@ -404,7 +438,7 @@ contract Lendgine is ERC20 {
                 if (cache.currentTick == MaxTick) revert CompleteUtilizationError();
 
                 cache.interestNumerator += cache.currentTick * remainingCurrentLiquidity;
-                cache.currentTick += 1;
+                cache.currentTick = currentTickInfo.next;
 
                 currentTickInfo = ticks[cache.currentTick];
                 remainingLP -= remainingCurrentLiquidity;
@@ -427,7 +461,7 @@ contract Lendgine is ERC20 {
                 break;
             } else {
                 cache.interestNumerator -= cache.currentTick * remainingCurrentLiquidity;
-                cache.currentTick -= 1; // should never underflow
+                cache.currentTick = currentTickInfo.prev;
 
                 currentTickInfo = ticks[cache.currentTick];
                 remainingLP -= remainingCurrentLiquidity;

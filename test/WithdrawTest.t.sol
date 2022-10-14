@@ -11,19 +11,19 @@ import { Position } from "../src/libraries/Position.sol";
 import { Factory } from "../src/Factory.sol";
 import { Lendgine } from "../src/Lendgine.sol";
 
-contract BurnMakerTest is TestHelper {
+contract WithdrawTest is TestHelper {
     bytes32 public positionID;
 
     function setUp() public {
         _setUp();
 
-        _mintMaker(1 ether, 8 ether, 1 ether, 1, cuh);
+        _deposit(1 ether, 8 ether, 1 ether, 1, cuh);
 
         positionID = Position.getID(cuh, 1);
     }
 
-    function testBurnMakerPartial() public {
-        _burnMaker(0.5 ether, 1, cuh);
+    function testWithdrawPartial() public {
+        _withdraw(0.5 ether, 1, cuh);
 
         assertEq(pair.buffer(), 0.5 ether);
 
@@ -35,11 +35,19 @@ contract BurnMakerTest is TestHelper {
         assertEq(rewardPerLiquidityPaid, 0);
         assertEq(tokensOwed, 0);
 
-        (uint256 tickLiquidity, uint256 rewardPerINPaid, uint256 tokensOwedPerLiquidity) = lendgine.ticks(1);
+        (
+            uint256 tickLiquidity,
+            uint256 rewardPerINPaid,
+            uint256 tokensOwedPerLiquidity,
+            uint16 prev,
+            uint16 next
+        ) = lendgine.ticks(1);
 
         assertEq(tickLiquidity, 0.5 ether);
         assertEq(rewardPerINPaid, 0);
         assertEq(tokensOwedPerLiquidity, 0);
+        assertEq(prev, 0);
+        assertEq(next, 0);
 
         assertEq(lendgine.currentTick(), 1);
         assertEq(lendgine.currentLiquidity(), 0);
@@ -48,8 +56,8 @@ contract BurnMakerTest is TestHelper {
         assertEq(lendgine.interestNumerator(), 0);
     }
 
-    function testBurnMakerFull() public {
-        _burnMaker(1 ether, 1, cuh);
+    function testWithdrawFull() public {
+        _withdraw(1 ether, 1, cuh);
 
         assertEq(pair.buffer(), 1 ether);
         assertEq(pair.totalSupply(), 1 ether);
@@ -60,11 +68,19 @@ contract BurnMakerTest is TestHelper {
         assertEq(rewardPerLiquidityPaid, 0);
         assertEq(tokensOwed, 0);
 
-        (uint256 tickLiquidity, uint256 rewardPerINPaid, uint256 tokensOwedPerLiquidity) = lendgine.ticks(1);
+        (
+            uint256 tickLiquidity,
+            uint256 rewardPerINPaid,
+            uint256 tokensOwedPerLiquidity,
+            uint16 prev,
+            uint16 next
+        ) = lendgine.ticks(1);
 
         assertEq(tickLiquidity, 0 ether);
         assertEq(rewardPerINPaid, 0);
         assertEq(tokensOwedPerLiquidity, 0);
+        assertEq(prev, 0);
+        assertEq(next, 0);
 
         assertEq(lendgine.currentTick(), 1);
         assertEq(lendgine.currentLiquidity(), 0);
