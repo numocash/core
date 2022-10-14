@@ -6,6 +6,9 @@ import { Factory } from "../../src/Factory.sol";
 import { Pair } from "../../src/Pair.sol";
 import { Lendgine } from "../../src/Lendgine.sol";
 
+import { Tick } from "../../src/libraries/Tick.sol";
+import { Position } from "../../src/libraries/Position.sol";
+
 import { MockERC20 } from "./mocks/MockERC20.sol";
 import { CallbackHelper } from "./CallbackHelper.sol";
 
@@ -59,7 +62,7 @@ abstract contract TestHelper is Test, CallbackHelper {
         pair = Pair(_pair);
     }
 
-    function _mintMaker(
+    function _deposit(
         uint256 amountBase,
         uint256 amountSpeculative,
         uint256 liquidity,
@@ -91,7 +94,7 @@ abstract contract TestHelper is Test, CallbackHelper {
         pair.mint(liquidity);
     }
 
-    function _burnMaker(
+    function _withdraw(
         uint256 amountLP,
         uint16 tick,
         address spender
@@ -116,5 +119,29 @@ abstract contract TestHelper is Test, CallbackHelper {
 
         lendgine.transferFrom(spender, address(lendgine), amount);
         lendgine.burn(spender);
+    }
+
+    function assertTick(Tick.Info memory tickInfo, uint16 tick) internal {
+        (
+            uint256 liquidity,
+            uint256 rewardPerINPaid,
+            uint256 tokensOwedPerLiquidity,
+            uint16 prev,
+            uint16 next
+        ) = lendgine.ticks(tick);
+
+        assertEq(tickInfo.liquidity, liquidity);
+        assertEq(tickInfo.rewardPerINPaid, rewardPerINPaid);
+        assertEq(tickInfo.tokensOwedPerLiquidity, tokensOwedPerLiquidity);
+        assertEq(tickInfo.prev, prev);
+        assertEq(tickInfo.next, next);
+    }
+
+    function assertPosition(Position.Info memory positionInfo, bytes32 id) internal {
+        (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(id);
+
+        assertEq(positionInfo.liquidity, liquidity);
+        assertEq(positionInfo.rewardPerLiquidityPaid, rewardPerLiquidityPaid);
+        assertEq(positionInfo.tokensOwed, tokensOwed);
     }
 }

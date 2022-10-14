@@ -8,6 +8,8 @@ import { IMintCallback } from "./interfaces/IMintCallback.sol";
 
 import { Position } from "./libraries/Position.sol";
 import { Tick } from "./libraries/Tick.sol";
+import { TickBitMaps } from "./libraries/TickBitMaps.sol";
+import { LiquidityMath } from "./libraries/LiquidityMath.sol";
 
 import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
 import { ERC20 } from "solmate/tokens/ERC20.sol";
@@ -21,9 +23,9 @@ import "forge-std/console2.sol";
 contract Lendgine is ERC20 {
     using Position for mapping(bytes32 => Position.Info);
     using Position for Position.Info;
-
     using Tick for mapping(uint16 => Tick.Info);
     using Tick for Tick.Info;
+    using TickBitMaps for TickBitMaps.TickBitMap;
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -88,6 +90,8 @@ contract Lendgine is ERC20 {
 
     mapping(uint16 => Tick.Info) public ticks;
 
+    TickBitMaps.TickBitMap public tickBitMap;
+
     uint256 public currentLiquidity;
 
     uint256 public interestNumerator;
@@ -140,7 +144,7 @@ contract Lendgine is ERC20 {
 
         _accrueInterest(cache);
 
-        if (cache.currentTick == 0) revert CompleteUtilizationError();
+        if (tickBitMap.firstTick == 0) revert CompleteUtilizationError();
 
         uint256 liquidity = convertAssetToLiquidity(amountS);
         uint256 shares = convertLiquidityToShare(liquidity);
@@ -209,23 +213,20 @@ contract Lendgine is ERC20 {
         bool utilized = (cache.currentTick == tick && cache.currentLiquidity > 0) || (tick < cache.currentTick);
         if (utilized) {
             _accrueInterest(cache);
-            if (tick != cache.currentTick) _accrueTickInterest(tick);
+            if (tick != cache.currentTick) _accrueTickInterest(tick, cache);
             _accruePositionInterest(id, tick);
         }
 
-        ticks.update(tick, int256(liquidity));
+        updateTick(tick, int256(liquidity));
         positions.update(id, int256(liquidity));
 
         if (tick < cache.currentTick) {
             cache.interestNumerator += liquidity * tick;
-
             decreaseCurrentLiquidity(liquidity, cache);
 
             interestNumerator = cache.interestNumerator;
             currentLiquidity = cache.currentLiquidity;
             currentTick = cache.currentTick;
-        } else if (cache.currentTick == 0) {
-            currentTick = tick;
         }
 
         Pair(pair).removeBuffer(liquidity);
@@ -236,7 +237,7 @@ contract Lendgine is ERC20 {
         StateCache memory cache = loadCache();
 
         if (liquidity == 0) revert InsufficientOutputError();
-        if (tick == 0) revert InvalidTick();
+        if (tick == 0 || tick > MaxTick) revert InvalidTick();
 
         bytes32 id = Position.getID(msg.sender, tick);
         Position.Info memory positionInfo = positions.get(msg.sender, tick);
@@ -246,7 +247,7 @@ contract Lendgine is ERC20 {
 
         if ((cache.currentTick == tick && cache.currentLiquidity > 0) || (tick < cache.currentTick)) {
             _accrueInterest(cache);
-            if (tick != cache.currentTick) _accrueTickInterest(tick);
+            if (tick != cache.currentTick) _accrueTickInterest(tick, cache);
             _accruePositionInterest(id, tick);
         }
 
@@ -257,12 +258,12 @@ contract Lendgine is ERC20 {
         } else if (tick == cache.currentTick && cache.currentLiquidity > remainingLiquidity) {
             utilizedLiquidity = cache.currentLiquidity - remainingLiquidity;
 
-            cache.currentTick += 1;
+            cache.currentTick = tickInfo.next;
             cache.currentLiquidity = 0;
         }
 
         // Remove position from the data structure
-        ticks.update(tick, -int256(liquidity));
+        updateTick(tick, -int256(liquidity));
         positions.update(id, -int256(liquidity));
 
         // Replace if we removed utilized liquidity
@@ -290,11 +291,11 @@ contract Lendgine is ERC20 {
     }
 
     function accrueTickInterest(uint16 tick) external lock {
-        if (tick == 0) revert InvalidTick();
+        if (tick == 0 || tick > MaxTick) revert InvalidTick();
         StateCache memory cache = loadCache();
 
         _accrueInterest(cache);
-        if (tick != currentTick) _accrueTickInterest(tick);
+        if (tick != currentTick) _accrueTickInterest(tick, cache);
     }
 
     function accruePositionInterest(uint16 tick) external lock {
@@ -304,7 +305,7 @@ contract Lendgine is ERC20 {
         StateCache memory cache = loadCache();
 
         _accrueInterest(cache);
-        if (tick != currentTick) _accrueTickInterest(tick);
+        if (tick != currentTick) _accrueTickInterest(tick, cache);
         _accruePositionInterest(id, tick);
     }
 
@@ -313,7 +314,7 @@ contract Lendgine is ERC20 {
         uint16 tick,
         uint256 amountSRequested
     ) external lock returns (uint256 amountS) {
-        if (tick == 0) revert InvalidTick();
+        if (tick == 0 || tick > MaxTick) revert InvalidTick();
 
         Position.Info storage position = positions.get(msg.sender, tick);
 
@@ -389,7 +390,49 @@ contract Lendgine is ERC20 {
                          INTERNAL LIQUIDITY LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    function updateTick(uint16 tick, int256 liquidityDelta) private {
+        Tick.Info storage info = ticks[tick];
+
+        bool init = info.liquidity == 0;
+        info.liquidity = LiquidityMath.addDelta(info.liquidity, liquidityDelta);
+        bool uninit = info.liquidity == 0;
+
+        if (init) {
+            if (tickBitMap.firstTick == 0) {
+                tickBitMap.firstTick = tick;
+            } else if (tick < tickBitMap.firstTick) {
+                ticks[tickBitMap.firstTick].prev = tick;
+                info.next = tickBitMap.firstTick;
+                tickBitMap.firstTick = tick;
+            } else {
+                uint16 below = tickBitMap.below(tick);
+                uint16 above = ticks[below].next;
+                info.prev = below;
+                info.next = above;
+                ticks[below].next = tick;
+                ticks[above].prev = tick;
+            }
+
+            tickBitMap.flipTick(tick, true);
+        } else if (uninit) {
+            if (tick == tickBitMap.firstTick) {
+                tickBitMap.firstTick = info.next;
+                ticks[info.next].prev = 0;
+            } else {
+                uint16 below = info.prev;
+                uint16 above = info.next;
+                ticks[below].next = above;
+                ticks[above].prev = below;
+            }
+
+            tickBitMap.flipTick(tick, false);
+            delete ticks[tick];
+        }
+    }
+
     function increaseCurrentLiquidity(uint256 liquidity, StateCache memory cache) private view {
+        if (cache.currentTick == 0) cache.currentTick = tickBitMap.firstTick;
+
         Tick.Info memory currentTickInfo = ticks[cache.currentTick];
 
         // amount of liquidity in this tick available
@@ -404,7 +447,7 @@ contract Lendgine is ERC20 {
                 if (cache.currentTick == MaxTick) revert CompleteUtilizationError();
 
                 cache.interestNumerator += cache.currentTick * remainingCurrentLiquidity;
-                cache.currentTick += 1;
+                cache.currentTick = currentTickInfo.next;
 
                 currentTickInfo = ticks[cache.currentTick];
                 remainingLP -= remainingCurrentLiquidity;
@@ -427,13 +470,13 @@ contract Lendgine is ERC20 {
                 break;
             } else {
                 cache.interestNumerator -= cache.currentTick * remainingCurrentLiquidity;
-                cache.currentTick -= 1; // should never underflow
+                cache.currentTick = currentTickInfo.prev;
 
                 currentTickInfo = ticks[cache.currentTick];
                 remainingLP -= remainingCurrentLiquidity;
                 remainingCurrentLiquidity = currentTickInfo.liquidity;
 
-                _accrueTickInterest(cache.currentTick);
+                _accrueTickInterest(cache.currentTick, cache);
             }
         }
         cache.interestNumerator -= cache.currentTick * remainingLP;
@@ -461,7 +504,7 @@ contract Lendgine is ERC20 {
         uint256 dilutionSpeculative = convertLiquidityToAsset(dilutionLP);
         rewardPerINStored += (dilutionSpeculative * 1 ether) / cache.interestNumerator;
 
-        _accrueTickInterest(currentTick);
+        _accrueTickInterest(currentTick, cache);
 
         decreaseCurrentLiquidity(dilutionLP, cache);
 
@@ -474,8 +517,9 @@ contract Lendgine is ERC20 {
         emit AccrueInterest(timeElapsed, dilutionSpeculative, dilutionLP, rewardPerINStored);
     }
 
-    function _accrueTickInterest(uint16 tick) private {
-        if (tick > currentTick) revert UnutilizedAccrueError();
+    function _accrueTickInterest(uint16 tick, StateCache memory cache) private {
+        if (tick > cache.currentTick || (tick == cache.currentTick && cache.currentLiquidity == 0))
+            revert UnutilizedAccrueError();
 
         Tick.Info storage tickInfo = ticks[tick];
         Tick.Info memory _tickInfo = tickInfo;

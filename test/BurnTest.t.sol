@@ -7,6 +7,7 @@ import { CallbackHelper } from "./utils/CallbackHelper.sol";
 
 import { LendgineAddress } from "../src/libraries/LendgineAddress.sol";
 import { Position } from "../src/libraries/Position.sol";
+import { Tick } from "../src/libraries/Tick.sol";
 
 import { Factory } from "../src/Factory.sol";
 import { Lendgine } from "../src/Lendgine.sol";
@@ -17,7 +18,7 @@ contract BurnTest is TestHelper {
     function setUp() public {
         _setUp();
 
-        _mintMaker(1 ether, 8 ether, 1 ether, 1, cuh);
+        _deposit(1 ether, 8 ether, 1 ether, 1, cuh);
 
         _mint(10 ether, cuh);
 
@@ -39,17 +40,12 @@ contract BurnTest is TestHelper {
         assertEq(speculative.balanceOf(cuh), 5 ether);
         assertEq(speculative.balanceOf(address(lendgine)), 5 ether);
 
-        (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(positionID);
+        assertPosition(Position.Info({ liquidity: 1 ether, rewardPerLiquidityPaid: 0, tokensOwed: 0 }), positionID);
 
-        assertEq(liquidity, 1 ether);
-        assertEq(rewardPerLiquidityPaid, 0);
-        assertEq(tokensOwed, 0);
-
-        (uint256 tickLiquidity, uint256 rewardPerINPaid, uint256 tokensOwedPerLiquidity) = lendgine.ticks(1);
-
-        assertEq(tickLiquidity, 1 ether);
-        assertEq(rewardPerINPaid, 0);
-        assertEq(tokensOwedPerLiquidity, 0);
+        assertTick(
+            Tick.Info({ liquidity: 1 ether, rewardPerINPaid: 0, tokensOwedPerLiquidity: 0, prev: 0, next: 0 }),
+            1
+        );
 
         // Test global storage values
         assertEq(lendgine.currentTick(), 1);
@@ -74,17 +70,12 @@ contract BurnTest is TestHelper {
         assertEq(speculative.balanceOf(cuh), 10 ether);
         assertEq(speculative.balanceOf(address(lendgine)), 0);
 
-        (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(positionID);
+        assertPosition(Position.Info({ liquidity: 1 ether, rewardPerLiquidityPaid: 0, tokensOwed: 0 }), positionID);
 
-        assertEq(liquidity, 1 ether);
-        assertEq(rewardPerLiquidityPaid, 0);
-        assertEq(tokensOwed, 0);
-
-        (uint256 tickLiquidity, uint256 rewardPerINPaid, uint256 tokensOwedPerLiquidity) = lendgine.ticks(1);
-
-        assertEq(tickLiquidity, 1 ether);
-        assertEq(rewardPerINPaid, 0);
-        assertEq(tokensOwedPerLiquidity, 0);
+        assertTick(
+            Tick.Info({ liquidity: 1 ether, rewardPerINPaid: 0, tokensOwedPerLiquidity: 0, prev: 0, next: 0 }),
+            1
+        );
 
         // Test global storage values
         assertEq(lendgine.currentTick(), 1);

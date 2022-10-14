@@ -7,6 +7,7 @@ import { CallbackHelper } from "./utils/CallbackHelper.sol";
 
 import { LendgineAddress } from "../src/libraries/LendgineAddress.sol";
 import { Position } from "../src/libraries/Position.sol";
+import { Tick } from "../src/libraries/Tick.sol";
 
 import { Factory } from "../src/Factory.sol";
 import { Lendgine } from "../src/Lendgine.sol";
@@ -16,32 +17,26 @@ contract MultiUserTest is TestHelper {
         _setUp();
     }
 
-    function testDoubleMintMakerSame() public {
-        _mintMaker(1 ether, 8 ether, 1 ether, 1, cuh);
-        _mintMaker(1 ether, 8 ether, 1 ether, 1, dennis);
+    function testDoubleDepositSame() public {
+        _deposit(1 ether, 8 ether, 1 ether, 1, cuh);
+        _deposit(1 ether, 8 ether, 1 ether, 1, dennis);
 
         bytes32 cuhPositionID = Position.getID(cuh, 1);
         bytes32 dennisPositionID = Position.getID(dennis, 1);
 
-        (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(cuhPositionID);
+        assertPosition(Position.Info({ liquidity: 1 ether, rewardPerLiquidityPaid: 0, tokensOwed: 0 }), cuhPositionID);
 
-        assertEq(liquidity, 1 ether);
-        assertEq(rewardPerLiquidityPaid, 0);
-        assertEq(tokensOwed, 0);
+        assertPosition(
+            Position.Info({ liquidity: 1 ether, rewardPerLiquidityPaid: 0, tokensOwed: 0 }),
+            dennisPositionID
+        );
 
-        (liquidity, rewardPerLiquidityPaid, tokensOwed) = lendgine.positions(dennisPositionID);
+        assertTick(
+            Tick.Info({ liquidity: 2 ether, rewardPerINPaid: 0, tokensOwedPerLiquidity: 0, prev: 0, next: 0 }),
+            1
+        );
 
-        assertEq(liquidity, 1 ether);
-        assertEq(rewardPerLiquidityPaid, 0);
-        assertEq(tokensOwed, 0);
-
-        (uint256 tickLiquidity, uint256 rewardPerINPaid, uint256 tokensOwedPerLiquidity) = lendgine.ticks(1);
-
-        assertEq(tickLiquidity, 2 * 1 ether);
-        assertEq(rewardPerINPaid, 0);
-        assertEq(tokensOwedPerLiquidity, 0);
-
-        assertEq(lendgine.currentTick(), 1);
+        assertEq(lendgine.currentTick(), 0);
         assertEq(lendgine.currentLiquidity(), 0);
         assertEq(lendgine.rewardPerINStored(), 0);
         assertEq(lendgine.lastUpdate(), 0);
@@ -50,38 +45,31 @@ contract MultiUserTest is TestHelper {
         assertEq(pair.buffer(), 0);
     }
 
-    function testDoubleMintMakerDifferent() public {
-        _mintMaker(1 ether, 8 ether, 1 ether, 1, cuh);
-        _mintMaker(1 ether, 8 ether, 1 ether, 2, dennis);
+    function testDoubleDepositDifferent() public {
+        _deposit(1 ether, 8 ether, 1 ether, 1, cuh);
+        _deposit(1 ether, 8 ether, 1 ether, 2, dennis);
 
         bytes32 cuhPositionID = Position.getID(cuh, 1);
         bytes32 dennisPositionID = Position.getID(dennis, 2);
 
-        (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(cuhPositionID);
+        assertPosition(Position.Info({ liquidity: 1 ether, rewardPerLiquidityPaid: 0, tokensOwed: 0 }), cuhPositionID);
 
-        assertEq(liquidity, 1 ether);
-        assertEq(rewardPerLiquidityPaid, 0);
-        assertEq(tokensOwed, 0);
+        assertPosition(
+            Position.Info({ liquidity: 1 ether, rewardPerLiquidityPaid: 0, tokensOwed: 0 }),
+            dennisPositionID
+        );
 
-        (liquidity, rewardPerLiquidityPaid, tokensOwed) = lendgine.positions(dennisPositionID);
+        assertTick(
+            Tick.Info({ liquidity: 1 ether, rewardPerINPaid: 0, tokensOwedPerLiquidity: 0, prev: 0, next: 2 }),
+            1
+        );
 
-        assertEq(liquidity, 1 ether);
-        assertEq(rewardPerLiquidityPaid, 0);
-        assertEq(tokensOwed, 0);
+        assertTick(
+            Tick.Info({ liquidity: 1 ether, rewardPerINPaid: 0, tokensOwedPerLiquidity: 0, prev: 1, next: 0 }),
+            2
+        );
 
-        (uint256 tickLiquidity, uint256 rewardPerINPaid, uint256 tokensOwedPerLiquidity) = lendgine.ticks(1);
-
-        assertEq(tickLiquidity, 1 ether);
-        assertEq(rewardPerINPaid, 0);
-        assertEq(tokensOwedPerLiquidity, 0);
-
-        (tickLiquidity, rewardPerINPaid, tokensOwedPerLiquidity) = lendgine.ticks(2);
-
-        assertEq(tickLiquidity, 1 ether);
-        assertEq(rewardPerINPaid, 0);
-        assertEq(tokensOwedPerLiquidity, 0);
-
-        assertEq(lendgine.currentTick(), 1);
+        assertEq(lendgine.currentTick(), 0);
         assertEq(lendgine.currentLiquidity(), 0);
         assertEq(lendgine.rewardPerINStored(), 0);
         assertEq(lendgine.lastUpdate(), 0);
@@ -90,40 +78,31 @@ contract MultiUserTest is TestHelper {
         assertEq(pair.buffer(), 0);
     }
 
-    function testRemoveUnutilizedMaker() public {
-        _mintMaker(1 ether, 8 ether, 1 ether, 1, cuh);
-        _mintMaker(1 ether, 8 ether, 1 ether, 2, dennis);
-        _burnMaker(1 ether, 1, cuh);
+    function testUnutilizedWithdraw() public {
+        _deposit(1 ether, 8 ether, 1 ether, 1, cuh);
+        _deposit(1 ether, 8 ether, 1 ether, 2, dennis);
+        _withdraw(1 ether, 1, cuh);
 
         bytes32 cuhPositionID = Position.getID(cuh, 1);
         bytes32 dennisPositionID = Position.getID(dennis, 2);
 
-        (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(cuhPositionID);
+        assertPosition(Position.Info({ liquidity: 0, rewardPerLiquidityPaid: 0, tokensOwed: 0 }), cuhPositionID);
 
-        assertEq(liquidity, 0);
-        assertEq(rewardPerLiquidityPaid, 0);
-        assertEq(tokensOwed, 0);
+        assertPosition(
+            Position.Info({ liquidity: 1 ether, rewardPerLiquidityPaid: 0, tokensOwed: 0 }),
+            dennisPositionID
+        );
 
-        (liquidity, rewardPerLiquidityPaid, tokensOwed) = lendgine.positions(dennisPositionID);
+        assertTick(
+            Tick.Info({ liquidity: 0 ether, rewardPerINPaid: 0, tokensOwedPerLiquidity: 0, prev: 0, next: 0 }),
+            1
+        );
 
-        assertEq(liquidity, 1 ether);
-        assertEq(rewardPerLiquidityPaid, 0);
-        assertEq(tokensOwed, 0);
-
-        (uint256 tickLiquidity, uint256 rewardPerINPaid, uint256 tokensOwedPerLiquidity) = lendgine.ticks(1);
-
-        assertEq(tickLiquidity, 0);
-        assertEq(rewardPerINPaid, 0);
-        assertEq(tokensOwedPerLiquidity, 0);
-
-        (tickLiquidity, rewardPerINPaid, tokensOwedPerLiquidity) = lendgine.ticks(2);
-
-        assertEq(tickLiquidity, 1 ether);
-        assertEq(rewardPerINPaid, 0);
-        assertEq(tokensOwedPerLiquidity, 0);
-
-        // TODO: what to do about removing a current tick
-        assertEq(lendgine.currentTick(), 1);
+        assertTick(
+            Tick.Info({ liquidity: 1 ether, rewardPerINPaid: 0, tokensOwedPerLiquidity: 0, prev: 0, next: 0 }),
+            2
+        );
+        assertEq(lendgine.currentTick(), 0);
         assertEq(lendgine.currentLiquidity(), 0);
         assertEq(lendgine.rewardPerINStored(), 0);
         assertEq(lendgine.lastUpdate(), 0);
@@ -133,40 +112,35 @@ contract MultiUserTest is TestHelper {
     }
 
     function testPartialRemoveUtilizedMaker() public {
-        _mintMaker(1 ether, 8 ether, 1 ether, 1, cuh);
-        _mintMaker(1 ether, 8 ether, 1 ether, 2, dennis);
+        _deposit(1 ether, 8 ether, 1 ether, 1, cuh);
+        _deposit(1 ether, 8 ether, 1 ether, 2, dennis);
         _mint(10 ether, address(this));
-        _burnMaker(0.5 ether, 1, cuh);
+        _withdraw(0.5 ether, 1, cuh);
 
         bytes32 cuhPositionID = Position.getID(cuh, 1);
         bytes32 dennisPositionID = Position.getID(dennis, 2);
 
         assertEq(lendgine.balanceOf(address(this)), 1 ether);
 
-        (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(cuhPositionID);
+        assertPosition(
+            Position.Info({ liquidity: 0.5 ether, rewardPerLiquidityPaid: 0, tokensOwed: 0 }),
+            cuhPositionID
+        );
 
-        assertEq(liquidity, 1 ether / 2);
-        assertEq(rewardPerLiquidityPaid, 0);
-        assertEq(tokensOwed, 0);
+        assertPosition(
+            Position.Info({ liquidity: 1 ether, rewardPerLiquidityPaid: 0, tokensOwed: 0 }),
+            dennisPositionID
+        );
 
-        (liquidity, rewardPerLiquidityPaid, tokensOwed) = lendgine.positions(dennisPositionID);
+        assertTick(
+            Tick.Info({ liquidity: 0.5 ether, rewardPerINPaid: 0, tokensOwedPerLiquidity: 0, prev: 0, next: 2 }),
+            1
+        );
 
-        assertEq(liquidity, 1 ether);
-        assertEq(rewardPerLiquidityPaid, 0);
-        assertEq(tokensOwed, 0);
-
-        (uint256 tickLiquidity, uint256 rewardPerINPaid, uint256 tokensOwedPerLiquidity) = lendgine.ticks(1);
-
-        assertEq(tickLiquidity, 1 ether / 2);
-        assertEq(rewardPerINPaid, 0);
-        assertEq(tokensOwedPerLiquidity, 0);
-
-        (tickLiquidity, rewardPerINPaid, tokensOwedPerLiquidity) = lendgine.ticks(2);
-
-        assertEq(tickLiquidity, 1 ether);
-        assertEq(rewardPerINPaid, 0);
-        assertEq(tokensOwedPerLiquidity, 0);
-
+        assertTick(
+            Tick.Info({ liquidity: 1 ether, rewardPerINPaid: 0, tokensOwedPerLiquidity: 0, prev: 1, next: 0 }),
+            2
+        );
         assertEq(lendgine.currentTick(), 2);
         assertEq(lendgine.currentLiquidity(), 0.5 ether);
         assertEq(lendgine.rewardPerINStored(), 0);
@@ -179,37 +153,27 @@ contract MultiUserTest is TestHelper {
     }
 
     function testFullRemoveUtilizedMaker() public {
-        _mintMaker(1 ether, 8 ether, 1 ether, 1, cuh);
-        _mintMaker(1 ether, 8 ether, 1 ether, 2, dennis);
+        _deposit(1 ether, 8 ether, 1 ether, 1, cuh);
+        _deposit(1 ether, 8 ether, 1 ether, 2, dennis);
         _mint(10 ether, address(this));
-        _burnMaker(1 ether, 1, cuh);
+        _withdraw(1 ether, 1, cuh);
 
         bytes32 cuhPositionID = Position.getID(cuh, 1);
         bytes32 dennisPositionID = Position.getID(dennis, 2);
 
-        (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(cuhPositionID);
+        assertPosition(Position.Info({ liquidity: 0, rewardPerLiquidityPaid: 0, tokensOwed: 0 }), cuhPositionID);
 
-        assertEq(liquidity, 0);
-        assertEq(rewardPerLiquidityPaid, 0);
-        assertEq(tokensOwed, 0);
+        assertPosition(
+            Position.Info({ liquidity: 1 ether, rewardPerLiquidityPaid: 0, tokensOwed: 0 }),
+            dennisPositionID
+        );
 
-        (liquidity, rewardPerLiquidityPaid, tokensOwed) = lendgine.positions(dennisPositionID);
+        assertTick(Tick.Info({ liquidity: 0, rewardPerINPaid: 0, tokensOwedPerLiquidity: 0, prev: 0, next: 0 }), 1);
 
-        assertEq(liquidity, 1 ether);
-        assertEq(rewardPerLiquidityPaid, 0);
-        assertEq(tokensOwed, 0);
-
-        (uint256 tickLiquidity, uint256 rewardPerINPaid, uint256 tokensOwedPerLiquidity) = lendgine.ticks(1);
-
-        assertEq(tickLiquidity, 0);
-        assertEq(rewardPerINPaid, 0);
-        assertEq(tokensOwedPerLiquidity, 0);
-
-        (tickLiquidity, rewardPerINPaid, tokensOwedPerLiquidity) = lendgine.ticks(2);
-
-        assertEq(tickLiquidity, 1 ether);
-        assertEq(rewardPerINPaid, 0);
-        assertEq(tokensOwedPerLiquidity, 0);
+        assertTick(
+            Tick.Info({ liquidity: 1 ether, rewardPerINPaid: 0, tokensOwedPerLiquidity: 0, prev: 0, next: 0 }),
+            2
+        );
 
         assertEq(lendgine.currentTick(), 2);
         assertEq(lendgine.currentLiquidity(), 1 ether);
@@ -221,36 +185,29 @@ contract MultiUserTest is TestHelper {
     }
 
     function testMintTwoTicksMaker() public {
-        _mintMaker(1 ether, 8 ether, 1 ether, 1, cuh);
-        _mintMaker(1 ether, 8 ether, 1 ether, 2, dennis);
+        _deposit(1 ether, 8 ether, 1 ether, 1, cuh);
+        _deposit(1 ether, 8 ether, 1 ether, 2, dennis);
         _mint(15 ether, address(this));
 
         bytes32 cuhPositionID = Position.getID(cuh, 1);
         bytes32 dennisPositionID = Position.getID(dennis, 2);
 
-        (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(cuhPositionID);
+        assertPosition(Position.Info({ liquidity: 1 ether, rewardPerLiquidityPaid: 0, tokensOwed: 0 }), cuhPositionID);
 
-        assertEq(liquidity, 1 ether);
-        assertEq(rewardPerLiquidityPaid, 0);
-        assertEq(tokensOwed, 0);
+        assertPosition(
+            Position.Info({ liquidity: 1 ether, rewardPerLiquidityPaid: 0, tokensOwed: 0 }),
+            dennisPositionID
+        );
 
-        (liquidity, rewardPerLiquidityPaid, tokensOwed) = lendgine.positions(dennisPositionID);
+        assertTick(
+            Tick.Info({ liquidity: 1 ether, rewardPerINPaid: 0, tokensOwedPerLiquidity: 0, prev: 0, next: 2 }),
+            1
+        );
 
-        assertEq(liquidity, 1 ether);
-        assertEq(rewardPerLiquidityPaid, 0);
-        assertEq(tokensOwed, 0);
-
-        (uint256 tickLiquidity, uint256 rewardPerINPaid, uint256 tokensOwedPerLiquidity) = lendgine.ticks(1);
-
-        assertEq(tickLiquidity, 1 ether);
-        assertEq(rewardPerINPaid, 0);
-        assertEq(tokensOwedPerLiquidity, 0);
-
-        (tickLiquidity, rewardPerINPaid, tokensOwedPerLiquidity) = lendgine.ticks(2);
-
-        assertEq(tickLiquidity, 1 ether);
-        assertEq(rewardPerINPaid, 0);
-        assertEq(tokensOwedPerLiquidity, 0);
+        assertTick(
+            Tick.Info({ liquidity: 1 ether, rewardPerINPaid: 0, tokensOwedPerLiquidity: 0, prev: 1, next: 0 }),
+            2
+        );
 
         assertEq(lendgine.currentTick(), 2);
         assertEq(lendgine.currentLiquidity(), 0.5 ether);
@@ -263,36 +220,29 @@ contract MultiUserTest is TestHelper {
     }
 
     function testMintFarTicksMaker() public {
-        _mintMaker(1 ether, 8 ether, 1 ether, 1, cuh);
-        _mintMaker(1 ether, 8 ether, 1 ether, 10, dennis);
+        _deposit(1 ether, 8 ether, 1 ether, 1, cuh);
+        _deposit(1 ether, 8 ether, 1 ether, 10, dennis);
         _mint(15 ether, address(this));
 
         bytes32 cuhPositionID = Position.getID(cuh, 1);
         bytes32 dennisPositionID = Position.getID(dennis, 10);
 
-        (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(cuhPositionID);
+        assertPosition(Position.Info({ liquidity: 1 ether, rewardPerLiquidityPaid: 0, tokensOwed: 0 }), cuhPositionID);
 
-        assertEq(liquidity, 1 ether);
-        assertEq(rewardPerLiquidityPaid, 0);
-        assertEq(tokensOwed, 0);
+        assertPosition(
+            Position.Info({ liquidity: 1 ether, rewardPerLiquidityPaid: 0, tokensOwed: 0 }),
+            dennisPositionID
+        );
 
-        (liquidity, rewardPerLiquidityPaid, tokensOwed) = lendgine.positions(dennisPositionID);
+        assertTick(
+            Tick.Info({ liquidity: 1 ether, rewardPerINPaid: 0, tokensOwedPerLiquidity: 0, prev: 0, next: 10 }),
+            1
+        );
 
-        assertEq(liquidity, 1 ether);
-        assertEq(rewardPerLiquidityPaid, 0);
-        assertEq(tokensOwed, 0);
-
-        (uint256 tickLiquidity, uint256 rewardPerINPaid, uint256 tokensOwedPerLiquidity) = lendgine.ticks(1);
-
-        assertEq(tickLiquidity, 1 ether);
-        assertEq(rewardPerINPaid, 0);
-        assertEq(tokensOwedPerLiquidity, 0);
-
-        (tickLiquidity, rewardPerINPaid, tokensOwedPerLiquidity) = lendgine.ticks(10);
-
-        assertEq(tickLiquidity, 1 ether);
-        assertEq(rewardPerINPaid, 0);
-        assertEq(tokensOwedPerLiquidity, 0);
+        assertTick(
+            Tick.Info({ liquidity: 1 ether, rewardPerINPaid: 0, tokensOwedPerLiquidity: 0, prev: 1, next: 0 }),
+            10
+        );
 
         assertEq(lendgine.currentTick(), 10);
         assertEq(lendgine.currentLiquidity(), 0.5 ether);
@@ -306,38 +256,31 @@ contract MultiUserTest is TestHelper {
     }
 
     function testMintUtilizedMaker() public {
-        _mintMaker(1 ether, 8 ether, 1 ether, 1, cuh);
-        _mintMaker(1 ether, 8 ether, 1 ether, 2, dennis);
+        _deposit(1 ether, 8 ether, 1 ether, 1, cuh);
+        _deposit(1 ether, 8 ether, 1 ether, 2, dennis);
         _mint(15 ether, address(this));
         pair.burn(address(this), 1.5 ether, 12 ether, 1.5 ether);
-        _mintMaker(1 ether, 8 ether, 1 ether, 1, cuh);
+        _deposit(1 ether, 8 ether, 1 ether, 1, cuh);
 
         bytes32 cuhPositionID = Position.getID(cuh, 1);
         bytes32 dennisPositionID = Position.getID(dennis, 2);
 
-        (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(cuhPositionID);
+        assertPosition(Position.Info({ liquidity: 2 ether, rewardPerLiquidityPaid: 0, tokensOwed: 0 }), cuhPositionID);
 
-        assertEq(liquidity, 2 * 1 ether);
-        assertEq(rewardPerLiquidityPaid, 0);
-        assertEq(tokensOwed, 0);
+        assertPosition(
+            Position.Info({ liquidity: 1 ether, rewardPerLiquidityPaid: 0, tokensOwed: 0 }),
+            dennisPositionID
+        );
 
-        (liquidity, rewardPerLiquidityPaid, tokensOwed) = lendgine.positions(dennisPositionID);
+        assertTick(
+            Tick.Info({ liquidity: 2 ether, rewardPerINPaid: 0, tokensOwedPerLiquidity: 0, prev: 0, next: 2 }),
+            1
+        );
 
-        assertEq(liquidity, 1 ether);
-        assertEq(rewardPerLiquidityPaid, 0);
-        assertEq(tokensOwed, 0);
-
-        (uint256 tickLiquidity, uint256 rewardPerINPaid, uint256 tokensOwedPerLiquidity) = lendgine.ticks(1);
-
-        assertEq(tickLiquidity, 2 * 1 ether);
-        assertEq(rewardPerINPaid, 0);
-        assertEq(tokensOwedPerLiquidity, 0);
-
-        (tickLiquidity, rewardPerINPaid, tokensOwedPerLiquidity) = lendgine.ticks(2);
-
-        assertEq(tickLiquidity, 1 ether);
-        assertEq(rewardPerINPaid, 0);
-        assertEq(tokensOwedPerLiquidity, 0);
+        assertTick(
+            Tick.Info({ liquidity: 1 ether, rewardPerINPaid: 0, tokensOwedPerLiquidity: 0, prev: 1, next: 0 }),
+            2
+        );
 
         assertEq(lendgine.currentTick(), 1);
         assertEq(lendgine.currentLiquidity(), 1.5 ether);
@@ -351,37 +294,30 @@ contract MultiUserTest is TestHelper {
     }
 
     function testMintNewUtilizedMaker() public {
-        _mintMaker(1 ether, 8 ether, 1 ether, 2, cuh);
+        _deposit(1 ether, 8 ether, 1 ether, 2, cuh);
         _mint(5 ether, address(this));
         pair.burn(address(this), 0.5 ether, 4 ether, 0.5 ether);
-        _mintMaker(1 ether, 8 ether, 1 ether, 1, dennis);
+        _deposit(1 ether, 8 ether, 1 ether, 1, dennis);
 
         bytes32 cuhPositionID = Position.getID(cuh, 2);
         bytes32 dennisPositionID = Position.getID(dennis, 1);
 
-        (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(cuhPositionID);
+        assertPosition(Position.Info({ liquidity: 1 ether, rewardPerLiquidityPaid: 0, tokensOwed: 0 }), cuhPositionID);
 
-        assertEq(liquidity, 1 ether);
-        assertEq(rewardPerLiquidityPaid, 0);
-        assertEq(tokensOwed, 0);
+        assertPosition(
+            Position.Info({ liquidity: 1 ether, rewardPerLiquidityPaid: 0, tokensOwed: 0 }),
+            dennisPositionID
+        );
 
-        (liquidity, rewardPerLiquidityPaid, tokensOwed) = lendgine.positions(dennisPositionID);
+        assertTick(
+            Tick.Info({ liquidity: 1 ether, rewardPerINPaid: 0, tokensOwedPerLiquidity: 0, prev: 0, next: 2 }),
+            1
+        );
 
-        assertEq(liquidity, 1 ether);
-        assertEq(rewardPerLiquidityPaid, 0);
-        assertEq(tokensOwed, 0);
-
-        (uint256 tickLiquidity, uint256 rewardPerINPaid, uint256 tokensOwedPerLiquidity) = lendgine.ticks(1);
-
-        assertEq(tickLiquidity, 1 ether);
-        assertEq(rewardPerINPaid, 0);
-        assertEq(tokensOwedPerLiquidity, 0);
-
-        (tickLiquidity, rewardPerINPaid, tokensOwedPerLiquidity) = lendgine.ticks(2);
-
-        assertEq(tickLiquidity, 1 ether);
-        assertEq(rewardPerINPaid, 0);
-        assertEq(tokensOwedPerLiquidity, 0);
+        assertTick(
+            Tick.Info({ liquidity: 1 ether, rewardPerINPaid: 0, tokensOwedPerLiquidity: 0, prev: 1, next: 0 }),
+            2
+        );
 
         assertEq(lendgine.currentTick(), 1);
         assertEq(lendgine.currentLiquidity(), 0.5 ether);
@@ -393,37 +329,30 @@ contract MultiUserTest is TestHelper {
     }
 
     function testRemoveTwoTicks() public {
-        _mintMaker(1 ether, 8 ether, 1 ether, 1, cuh);
-        _mintMaker(1 ether, 8 ether, 1 ether, 2, dennis);
+        _deposit(1 ether, 8 ether, 1 ether, 1, cuh);
+        _deposit(1 ether, 8 ether, 1 ether, 2, dennis);
         _mint(15 ether, address(this));
         _burn(1 ether, address(this));
 
         bytes32 cuhPositionID = Position.getID(cuh, 1);
         bytes32 dennisPositionID = Position.getID(dennis, 2);
 
-        (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(cuhPositionID);
+        assertPosition(Position.Info({ liquidity: 1 ether, rewardPerLiquidityPaid: 0, tokensOwed: 0 }), cuhPositionID);
 
-        assertEq(liquidity, 1 ether);
-        assertEq(rewardPerLiquidityPaid, 0);
-        assertEq(tokensOwed, 0);
+        assertPosition(
+            Position.Info({ liquidity: 1 ether, rewardPerLiquidityPaid: 0, tokensOwed: 0 }),
+            dennisPositionID
+        );
 
-        (liquidity, rewardPerLiquidityPaid, tokensOwed) = lendgine.positions(dennisPositionID);
+        assertTick(
+            Tick.Info({ liquidity: 1 ether, rewardPerINPaid: 0, tokensOwedPerLiquidity: 0, prev: 0, next: 2 }),
+            1
+        );
 
-        assertEq(liquidity, 1 ether);
-        assertEq(rewardPerLiquidityPaid, 0);
-        assertEq(tokensOwed, 0);
-
-        (uint256 tickLiquidity, uint256 rewardPerINPaid, uint256 tokensOwedPerLiquidity) = lendgine.ticks(1);
-
-        assertEq(tickLiquidity, 1 ether);
-        assertEq(rewardPerINPaid, 0);
-        assertEq(tokensOwedPerLiquidity, 0);
-
-        (tickLiquidity, rewardPerINPaid, tokensOwedPerLiquidity) = lendgine.ticks(2);
-
-        assertEq(tickLiquidity, 1 ether);
-        assertEq(rewardPerINPaid, 0);
-        assertEq(tokensOwedPerLiquidity, 0);
+        assertTick(
+            Tick.Info({ liquidity: 1 ether, rewardPerINPaid: 0, tokensOwedPerLiquidity: 0, prev: 1, next: 0 }),
+            2
+        );
 
         assertEq(lendgine.currentTick(), 1);
         assertEq(lendgine.currentLiquidity(), 0.5 ether);
@@ -436,11 +365,11 @@ contract MultiUserTest is TestHelper {
     }
 
     function testRemoveSharedTick() public {
-        _mintMaker(1 ether, 8 ether, 1 ether, 1, cuh);
-        _mintMaker(1 ether, 8 ether, 1 ether, 1, dennis);
-        _mintMaker(1 ether, 8 ether, 1 ether, 2, dennis);
+        _deposit(1 ether, 8 ether, 1 ether, 1, cuh);
+        _deposit(1 ether, 8 ether, 1 ether, 1, dennis);
+        _deposit(1 ether, 8 ether, 1 ether, 2, dennis);
         _mint(10 ether, address(this));
-        _burnMaker(0.5 ether, 1, cuh);
+        _withdraw(0.5 ether, 1, cuh);
 
         assertEq(lendgine.currentTick(), 1);
         assertEq(lendgine.currentLiquidity(), 1 ether);

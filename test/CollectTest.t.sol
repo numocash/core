@@ -7,6 +7,7 @@ import { CallbackHelper } from "./utils/CallbackHelper.sol";
 
 import { LendgineAddress } from "../src/libraries/LendgineAddress.sol";
 import { Position } from "../src/libraries/Position.sol";
+import { Tick } from "../src/libraries/Tick.sol";
 
 import { Factory } from "../src/Factory.sol";
 import { Lendgine } from "../src/Lendgine.sol";
@@ -17,7 +18,7 @@ contract CollectTest is TestHelper {
     function setUp() public {
         _setUp();
 
-        _mintMaker(1 ether, 8 ether, 1 ether, 1, cuh);
+        _deposit(1 ether, 8 ether, 1 ether, 1, cuh);
         _mint(1 ether, cuh);
 
         positionID = Position.getID(cuh, 1);
@@ -43,17 +44,21 @@ contract CollectTest is TestHelper {
         assertEq(speculative.balanceOf(cuh), (dilution * 10));
         assertEq(speculative.balanceOf(address(lendgine)), 1 ether - (dilution * 10));
 
-        (uint256 liquidity, uint256 rewardPerLiquidityPaid, uint256 tokensOwed) = lendgine.positions(positionID);
+        assertPosition(
+            Position.Info({ liquidity: 1 ether, rewardPerLiquidityPaid: dilution * 10, tokensOwed: 0 }),
+            positionID
+        );
 
-        assertEq(liquidity, 1 ether);
-        assertEq(rewardPerLiquidityPaid, (dilution * 10));
-        assertEq(tokensOwed, 0);
-
-        (uint256 tickLiquidity, uint256 rewardPerINPaid, uint256 tokensOwedPerLiquidity) = lendgine.ticks(1);
-
-        assertEq(tickLiquidity, 1 ether);
-        assertEq(rewardPerINPaid, (dilution * 10 * 10));
-        assertEq(tokensOwedPerLiquidity, (dilution * 10));
+        assertTick(
+            Tick.Info({
+                liquidity: 1 ether,
+                rewardPerINPaid: dilution * 100,
+                tokensOwedPerLiquidity: dilution * 10,
+                prev: 0,
+                next: 0
+            }),
+            1
+        );
 
         // Test global storage values
         assertEq(lendgine.currentTick(), 1);
