@@ -4,7 +4,6 @@ pragma solidity >=0.5.0;
 /// @notice A gas efficient and opinionated CFMM pair with the capped power invariant
 /// @author Kyle Scott (https://github.com/numoen/core/blob/master/src/Pair.sol)
 /// @author Modified from Uniswap (https://github.com/Uniswap/v2-core/blob/master/contracts/UniswapV2Pair.sol)
-/// Primitive (https://github.com/primitivefinance/rmm-core/blob/main/contracts/PrimitiveEngine.sol),
 /// and Solmate (https://github.com/transmissions11/solmate/blob/main/src/tokens/ERC20.sol)
 interface IPair {
     /// @notice The contract that deployed the pair

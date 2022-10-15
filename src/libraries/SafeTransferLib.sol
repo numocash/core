@@ -2,10 +2,10 @@
 pragma solidity >=0.8.0;
 
 /// @notice Safe ERC20 transfer library that gracefully handles missing return values.
-/// @author Kyle Scott (https://github.com/numoen/core/blob/master/src/libaries/TransferHelper.sol)
+/// @author Kyle Scott (https://github.com/numoen/core/blob/master/src/libaries/SafeTransferLib.sol)
 /// @author Modified from Rari (https://github.com/Rari-Capital/solmate/blob/main/src/utils/SafeTransferLib.sol),
 /// (Gnosis (https://github.com/gnosis/gp-v2-contracts/blob/main/src/contracts/libraries/GPv2SafeERC20.sol),
-/// and solmate (https://github.com/transmissions11/solmate/blob/main/src/tokens/ERC20.sol)
+/// and solmate (https://github.com/transmissions11/solmate/blob/main/src/utils/SafeTransferLib.sol)
 /// @dev Use with caution! Some functions in this library knowingly create dirty bits at the destination of the free memory pointer.
 /// @dev Edited from using error message to custom error for lower bytecode size.
 library SafeTransferLib {
