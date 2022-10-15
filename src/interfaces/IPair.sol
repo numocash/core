@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: GPL-3.0-only
 pragma solidity >=0.5.0;
 
 /// @notice A gas efficient and opinionated CFMM pair with the capped power invariant
