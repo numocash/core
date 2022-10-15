@@ -1,7 +1,5 @@
 pragma solidity ^0.8.4;
 
-import { LendgineAddress } from "../../src/libraries/LendgineAddress.sol";
-
 import { Factory } from "../../src/Factory.sol";
 import { Pair } from "../../src/Pair.sol";
 import { Lendgine } from "../../src/Lendgine.sol";
@@ -26,8 +24,6 @@ abstract contract TestHelper is Test, CallbackHelper {
     address public immutable cuh;
     address public immutable dennis;
 
-    LendgineAddress.LendgineKey public key;
-
     Factory public factory;
 
     Lendgine public lendgine;
@@ -46,8 +42,6 @@ abstract contract TestHelper is Test, CallbackHelper {
 
         cuh = mkaddr("cuh");
         dennis = mkaddr("dennis");
-
-        key = LendgineAddress.getLendgineKey(address(base), address(speculative), upperBound);
     }
 
     function _setUp() internal {
@@ -110,7 +104,11 @@ abstract contract TestHelper is Test, CallbackHelper {
             vm.prank(spender);
             speculative.approve(address(this), amount);
         }
-        lendgine.mint(spender, amount, abi.encode(CallbackHelper.CallbackData({ key: key, payer: spender })));
+        lendgine.mint(
+            spender,
+            amount,
+            abi.encode(CallbackHelper.CallbackData({ speculative: address(speculative), payer: spender }))
+        );
     }
 
     function _burn(uint256 amount, address spender) internal {

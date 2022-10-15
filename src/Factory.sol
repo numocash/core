@@ -4,18 +4,16 @@ pragma solidity ^0.8.4;
 import { Lendgine } from "./Lendgine.sol";
 import { Pair } from "./Pair.sol";
 
-/// @notice Manages the recording and create of lending engines
-/// @author Kyle Scott (https://github.com/numoen/core/blob/master/src/Factory.sol)
-/// @author Modified from Uniswap (https://github.com/Uniswap/v2-core/blob/master/contracts/UniswapV2Factory.sol)
-/// and Primitive (https://github.com/primitivefinance/rmm-core/blob/main/contracts/PrimitiveFactory.sol)
-contract Factory {
+import { IFactory } from "./interfaces/IFactory.sol";
+
+contract Factory is IFactory {
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
 
     event LendgineCreated(
-        address indexed baseToken,
-        address indexed speculativeToken,
+        address indexed base,
+        address indexed speculative,
         uint256 indexed upperBound,
         address lendgine
     );
@@ -34,40 +32,43 @@ contract Factory {
                             FACTORY STORAGE
     //////////////////////////////////////////////////////////////*/
 
-    mapping(address => mapping(address => mapping(uint256 => address))) public getLendgine;
+    /// @inheritdoc IFactory
+    mapping(address => mapping(address => mapping(uint256 => address))) public override getLendgine;
 
     /*//////////////////////////////////////////////////////////////
                         TEMPORARY DEPLOY STORAGE
     //////////////////////////////////////////////////////////////*/
 
     struct Parameters {
-        address baseToken;
-        address speculativeToken;
+        address base;
+        address speculative;
         uint256 upperBound;
     }
 
-    Parameters public parameters;
+    /// @inheritdoc IFactory
+    Parameters public override parameters;
 
     /*//////////////////////////////////////////////////////////////
                               FACTORY LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    /// @inheritdoc IFactory
     function createLendgine(
-        address baseToken,
-        address speculativeToken,
+        address base,
+        address speculative,
         uint256 upperBound
-    ) external returns (address _lendgine) {
-        if (speculativeToken == baseToken) revert SameTokenError();
-        if (speculativeToken == address(0) || baseToken == address(0)) revert ZeroAddressError();
-        if (getLendgine[baseToken][speculativeToken][upperBound] != address(0)) revert DeployedError();
+    ) external override returns (address lendgine) {
+        if (speculative == base) revert SameTokenError();
+        if (speculative == address(0) || base == address(0)) revert ZeroAddressError();
+        if (getLendgine[base][speculative][upperBound] != address(0)) revert DeployedError();
 
-        parameters = Parameters({ baseToken: baseToken, speculativeToken: speculativeToken, upperBound: upperBound });
-        _lendgine = address(new Lendgine{ salt: keccak256(abi.encode(baseToken, speculativeToken, upperBound)) }());
+        parameters = Parameters({ base: base, speculative: speculative, upperBound: upperBound });
+        lendgine = address(new Lendgine{ salt: keccak256(abi.encode(base, speculative, upperBound)) }());
 
         delete parameters;
 
-        getLendgine[baseToken][speculativeToken][upperBound] = _lendgine;
+        getLendgine[base][speculative][upperBound] = lendgine;
 
-        emit LendgineCreated(baseToken, speculativeToken, upperBound, _lendgine);
+        emit LendgineCreated(base, speculative, upperBound, lendgine);
     }
 }

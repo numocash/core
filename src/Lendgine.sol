@@ -6,18 +6,15 @@ import { Pair } from "./Pair.sol";
 import { ERC20 } from "./ERC20.sol";
 
 import { IMintCallback } from "./interfaces/IMintCallback.sol";
+import { ILendgine } from "./interfaces/ILendgine.sol";
 
 import { Position } from "./libraries/Position.sol";
 import { Tick } from "./libraries/Tick.sol";
 import { TickBitMaps } from "./libraries/TickBitMaps.sol";
 import { LiquidityMath } from "./libraries/LiquidityMath.sol";
-import { TransferHelper } from "./libraries/TransferHelper.sol";
+import { SafeTransferLib } from "./libraries/SafeTransferLib.sol";
 
-/// @notice A CFMM share lending engine
-/// @author Kyle Scott (https://github.com/numoen/core/blob/master/src/Lendgine.sol)
-/// @author Modified from Uniswap (https://github.com/Uniswap/v3-core/blob/main/contracts/UniswapV3Pool.sol)
-/// and Primitive (https://github.com/primitivefinance/rmm-core/blob/main/contracts/PrimitiveEngine.sol)
-contract Lendgine is ERC20 {
+contract Lendgine is ILendgine, ERC20 {
     using Position for mapping(bytes32 => Position.Info);
     using Position for Position.Info;
     using Tick for mapping(uint16 => Tick.Info);
@@ -72,44 +69,46 @@ contract Lendgine is ERC20 {
     /*//////////////////////////////////////////////////////////////
                                IMMUTABLES
     //////////////////////////////////////////////////////////////*/
-    /// @notice The maximum allowed interest rate tick
-    uint16 public constant MaxTick = 10_000;
 
-    /// @notice The contract that deployed the lendgine
-    address public immutable factory;
+    /// @inheritdoc ILendgine
+    uint16 public constant override MaxTick = 10_000;
 
-    /// @notice The CFMM that is used in the lendgine
-    address public immutable pair;
+    /// @inheritdoc ILendgine
+    address public immutable override factory;
+
+    /// @inheritdoc ILendgine
+    address public immutable override pair;
 
     /*//////////////////////////////////////////////////////////////
                           LENDGINE STORAGE
     //////////////////////////////////////////////////////////////*/
 
-    mapping(bytes32 => Position.Info) public positions;
+    /// @inheritdoc ILendgine
+    mapping(bytes32 => Position.Info) public override positions;
 
-    mapping(uint16 => Tick.Info) public ticks;
+    /// @inheritdoc ILendgine
+    mapping(uint16 => Tick.Info) public override ticks;
 
     /// @notice BitMap used for keeping track of which tick contain >0 liquidity
     TickBitMaps.TickBitMap public tickBitMap;
 
-    /// @notice The liquidity in the `currentTick`
-    uint256 public currentLiquidity;
+    /// @inheritdoc ILendgine
+    uint256 public override currentLiquidity;
 
-    /// @notice The sum of tick * borrow liquidity for all borrowed liquidity
-    uint256 public interestNumerator;
+    /// @inheritdoc ILendgine
+    uint256 public override interestNumerator;
 
-    /// @notice The currently borrowed liquidity by borrowers
-    uint256 public totalLiquidityBorrowed;
+    /// @inheritdoc ILendgine
+    uint256 public override totalLiquidityBorrowed;
 
-    /// @notice The amount of speculative assert rewarded to each unit of `interestNumerator` scaled by one ether
-    uint256 public rewardPerINStored;
+    /// @inheritdoc ILendgine
+    uint256 public override rewardPerINStored;
 
-    /// @notice The timestamp at which interest was last accrued
-    uint64 public lastUpdate;
+    /// @inheritdoc ILendgine
+    uint64 public override lastUpdate;
 
-    /// @notice The index of the highest tick that is being borrowed from
-    /// @dev A value of 0 corresponds to an uninitialized state
-    uint16 public currentTick;
+    /// @inheritdoc ILendgine
+    uint16 public override currentTick;
 
     /*//////////////////////////////////////////////////////////////
                            REENTRANCY LOGIC
@@ -141,19 +140,12 @@ contract Lendgine is ERC20 {
                             MINT/BURN LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Creates a position with amountS `speculative` tokens as collateral and `pair` CFMM share
-    /// as debt, exactly replicating the desired payoff
-    /// @dev This function uses a callback architecture capable of flash-minting
-    /// @param to The address to mint the position to
-    /// @param amountS The amount of `speculative` tokens to use as collateral, which determines
-    /// the size of the position
-    /// @param data Any data that should be passed through to the callback
-    /// @return shares The size of the position that was sent to `to`
+    /// @inheritdoc ILendgine
     function mint(
         address to,
         uint256 amountS,
         bytes calldata data
-    ) external lock returns (uint256 shares) {
+    ) external override lock returns (uint256 shares) {
         StateCache memory cache = loadCache();
 
         _accrueInterest(cache);
@@ -183,12 +175,8 @@ contract Lendgine is ERC20 {
         emit Mint(msg.sender, amountS, shares, liquidity, to);
     }
 
-    /// @notice Burns a position, paying back debt and refunding collateral to the `to` address
-    /// @dev The position that is to be burned should be sent to this contract before invoking this function
-    /// @dev This assumes there is at least the amount of debt that is owed by this position
-    /// @param to The address to send the unlocked collateral to
-    /// @return amountS The amount of `speculative` tokens that have been sent to the `to` address
-    function burn(address to) external lock returns (uint256 amountS) {
+    /// @inheritdoc ILendgine
+    function burn(address to) external override lock returns (uint256 amountS) {
         StateCache memory cache = loadCache();
 
         _accrueInterest(cache);
@@ -208,7 +196,7 @@ contract Lendgine is ERC20 {
 
         _burn(address(this), shares);
         Pair(pair).removeBuffer(liquidity);
-        TransferHelper.safeTransfer(Pair(pair).speculative(), to, amountS);
+        SafeTransferLib.safeTransfer(Pair(pair).speculative(), to, amountS);
 
         emit Burn(msg.sender, amountS, shares, liquidity, to);
     }
@@ -217,11 +205,8 @@ contract Lendgine is ERC20 {
                         DEPOSIT/WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Deposit CFMM shares from the `pair` to be lent out
-    /// @dev The appropriate position should be minted in the pair contract before invoking this function
-    /// @param to The address for which the deposit will be owned by
-    /// @param tick The interest rate tick at which the liquidity can be lent out
-    function deposit(address to, uint16 tick) external lock {
+    /// @inheritdoc ILendgine
+    function deposit(address to, uint16 tick) external override lock {
         StateCache memory cache = loadCache();
 
         uint256 liquidity = Pair(pair).buffer();
@@ -254,11 +239,8 @@ contract Lendgine is ERC20 {
         emit Deposit(msg.sender, liquidity, tick, to);
     }
 
-    /// @notice Withdraw CFMM shares from the lending engine
-    /// @dev The shares must still be withdrawn from the `pair`
-    /// @param tick The tick at which to remove shares
-    /// @param liquidity The amount of liquidity to remove
-    function withdraw(uint16 tick, uint256 liquidity) external lock {
+    /// @inheritdoc ILendgine
+    function withdraw(uint16 tick, uint256 liquidity) external override lock {
         StateCache memory cache = loadCache();
 
         if (liquidity == 0) revert InsufficientOutputError();
@@ -310,16 +292,14 @@ contract Lendgine is ERC20 {
                             INTEREST LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Calculates the interest rate and amount of interest that has gathered since the last update,
-    /// then charges the borrowers and pays the lenders
-    /// @dev Only positive interest rates are allowed
-    function accrueInterest() external lock {
+    /// @inheritdoc ILendgine
+    function accrueInterest() external override lock {
         StateCache memory cache = loadCache();
         _accrueInterest(cache);
     }
 
-    /// @notice Calculates the interest accrued by a specific tick
-    function accrueTickInterest(uint16 tick) external lock {
+    /// @inheritdoc ILendgine
+    function accrueTickInterest(uint16 tick) external override lock {
         if (tick == 0 || tick > MaxTick) revert InvalidTick();
         StateCache memory cache = loadCache();
 
@@ -327,10 +307,8 @@ contract Lendgine is ERC20 {
         if (tick != currentTick) _accrueTickInterest(tick, cache);
     }
 
-    /// @notice Calculates the interest accrued by a specific postion
-    /// @dev msg.sender is used to calculate the owner of the position
-    /// @param tick The tick index of the position
-    function accruePositionInterest(uint16 tick) external lock {
+    /// @inheritdoc ILendgine
+    function accruePositionInterest(uint16 tick) external override lock {
         if (tick == 0) revert InvalidTick();
 
         bytes32 id = Position.getID(msg.sender, tick);
@@ -341,16 +319,12 @@ contract Lendgine is ERC20 {
         _accruePositionInterest(id, tick);
     }
 
-    /// @notice Collects tokens owed to a postion
-    /// @dev msg.sender is used to calculative the owner of the position
-    /// @param to The address to send the collected tokens to
-    /// @param tick The tick index of the position
-    /// @param amountSRequested How much `speculative` tokens should be withdrawn from the tokens owed
+    /// @inheritdoc ILendgine
     function collect(
         address to,
         uint16 tick,
         uint256 amountSRequested
-    ) external lock returns (uint256 amountS) {
+    ) external override lock returns (uint256 amountS) {
         if (tick == 0 || tick > MaxTick) revert InvalidTick();
 
         Position.Info storage position = positions.get(msg.sender, tick);
@@ -359,7 +333,7 @@ contract Lendgine is ERC20 {
 
         if (amountS > 0) {
             position.tokensOwed -= amountS;
-            TransferHelper.safeTransfer(Pair(pair).speculative(), to, amountS);
+            SafeTransferLib.safeTransfer(Pair(pair).speculative(), to, amountS);
         }
 
         emit Collect(msg.sender, to, amountS);
@@ -369,24 +343,24 @@ contract Lendgine is ERC20 {
                             ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Convert `pair` liquidity shares to amount of replicating derivative shares
-    function convertLiquidityToShare(uint256 liquidity) public view returns (uint256) {
+    /// @inheritdoc ILendgine
+    function convertLiquidityToShare(uint256 liquidity) public view override returns (uint256) {
         uint256 _totalLiquidityBorrowed = totalLiquidityBorrowed;
         return _totalLiquidityBorrowed == 0 ? liquidity : (liquidity * totalSupply) / _totalLiquidityBorrowed;
     }
 
-    /// @notice Convert replicating derivative shares to `pair` liquidity shares
-    function convertShareToLiquidity(uint256 shares) public view returns (uint256) {
+    /// @inheritdoc ILendgine
+    function convertShareToLiquidity(uint256 shares) public view override returns (uint256) {
         return (totalLiquidityBorrowed * shares) / totalSupply;
     }
 
-    /// @notice Convert `speculative` tokens to maximum amount of borrowable `pair` shares
-    function convertAssetToLiquidity(uint256 assets) public view returns (uint256) {
+    /// @inheritdoc ILendgine
+    function convertAssetToLiquidity(uint256 assets) public view override returns (uint256) {
         return (assets * 10**18) / (2 * Pair(pair).upperBound());
     }
 
-    /// @notice Convert `pair` liquidity shares to minimum amount of `speculative` collateral
-    function convertLiquidityToAsset(uint256 liquidity) public view returns (uint256) {
+    /// @inheritdoc ILendgine
+    function convertLiquidityToAsset(uint256 liquidity) public view override returns (uint256) {
         return (2 * liquidity * Pair(pair).upperBound()) / 10**18;
     }
 
@@ -415,9 +389,8 @@ contract Lendgine is ERC20 {
                                  VIEW
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Returns the `speculative` balances of the lendgine
-    /// @dev Not to be relied upon anywhere else because of a potential readonly reentracy
-    function balanceSpeculative() public view returns (uint256) {
+    /// @inheritdoc ILendgine
+    function balanceSpeculative() public view override returns (uint256) {
         bool success;
         bytes memory data;
 
@@ -475,6 +448,8 @@ contract Lendgine is ERC20 {
         }
     }
 
+    /// @notice Increases the amount of borrowed liquidity in a sorted order, borrowing the liquidity
+    /// with the lowest interest rate first
     function increaseCurrentLiquidity(uint256 liquidity, StateCache memory cache) private view {
         if (cache.currentTick == 0) cache.currentTick = tickBitMap.firstTick;
 
@@ -504,6 +479,8 @@ contract Lendgine is ERC20 {
         cache.currentLiquidity += remainingLP;
     }
 
+    /// @notice Decrease the amount of borrowed liquidity in a sorted order, repaying the liquidity
+    /// with the highest interest rate first
     function decreaseCurrentLiquidity(uint256 liquidity, StateCache memory cache) private {
         Tick.Info memory currentTickInfo = ticks[cache.currentTick];
 
@@ -532,6 +509,7 @@ contract Lendgine is ERC20 {
                          INTERNAL INTEREST LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Helper function for accruing lendgine interest
     function _accrueInterest(StateCache memory cache) private {
         if (totalSupply == 0) {
             lastUpdate = uint64(block.timestamp);
@@ -562,6 +540,9 @@ contract Lendgine is ERC20 {
         emit AccrueInterest(timeElapsed, dilutionSpeculative, dilutionLP, rewardPerINStored);
     }
 
+    /// @notice Helper function for accruing interest to a position
+    /// @dev Assumes the lendgine total interest is up to date
+    /// @param tick The tick index to accrue interst to
     function _accrueTickInterest(uint16 tick, StateCache memory cache) private {
         if (tick > cache.currentTick || (tick == cache.currentTick && cache.currentLiquidity == 0))
             revert UnutilizedAccrueError();
@@ -580,7 +561,10 @@ contract Lendgine is ERC20 {
         emit AccrueTickInterest(tick, rewardPerINStored, tokensOwed);
     }
 
-    /// @dev assume global interest accrual is up to date
+    /// @notice Helper function for accruing interest to a position
+    /// @dev Assume the `tick` interest is up to date
+    /// @param id Position ID that is being accrued
+    /// @param tick The tick index that this position belongs to
     function _accruePositionInterest(bytes32 id, uint16 tick) private {
         Position.Info storage position = positions[id];
         Position.Info memory _position = position;
@@ -596,7 +580,8 @@ contract Lendgine is ERC20 {
         emit AccruePositionInterest(tick, id, _tickInfo.tokensOwedPerLiquidity, tokensOwed);
     }
 
-    /// @dev Assumes reward per token stored is up to date
+    /// @notice Helper function for determining amount of tokens owed to a tick
+    /// @dev Assumes the lendgine total interest is up to date
     function newTokensOwed(Tick.Info memory tickInfo, uint16 tick) private view returns (uint256) {
         if (tick > currentTick) return 0;
 
@@ -608,7 +593,8 @@ contract Lendgine is ERC20 {
         return (liquidity * tick * (rewardPerINStored - tickInfo.rewardPerINPaid)) / 1 ether;
     }
 
-    /// @dev Assumes reward per token stored is up to date
+    /// @notice Helper function for determining the amount of tokens owed to a position
+    /// @dev Assumes the `tick` interest is up to date
     function newTokensOwed(Position.Info memory position, Tick.Info memory tickInfo) private pure returns (uint256) {
         uint256 liquidity = position.liquidity;
 

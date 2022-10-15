@@ -5,7 +5,6 @@ import "forge-std/console2.sol";
 import { TestHelper } from "./utils/TestHelper.sol";
 import { CallbackHelper } from "./utils/CallbackHelper.sol";
 
-import { LendgineAddress } from "../src/libraries/LendgineAddress.sol";
 import { Position } from "../src/libraries/Position.sol";
 import { Tick } from "../src/libraries/Tick.sol";
 

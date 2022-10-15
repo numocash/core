@@ -4,7 +4,6 @@ import "forge-std/console2.sol";
 
 import { TestHelper } from "./utils/TestHelper.sol";
 
-import { LendgineAddress } from "../src/libraries/LendgineAddress.sol";
 import { Position } from "../src/libraries/Position.sol";
 import { Tick } from "../src/libraries/Tick.sol";
 
@@ -68,7 +67,11 @@ contract MintTest is TestHelper {
 
     function testZeroMint() public {
         vm.expectRevert(Lendgine.InsufficientOutputError.selector);
-        lendgine.mint(cuh, 0 ether, abi.encode(CallbackHelper.CallbackData({ key: key, payer: cuh })));
+        lendgine.mint(
+            cuh,
+            0 ether,
+            abi.encode(CallbackHelper.CallbackData({ speculative: address(speculative), payer: cuh }))
+        );
     }
 
     // function testExtraMint() public {

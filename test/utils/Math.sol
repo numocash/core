@@ -3,12 +3,8 @@ pragma solidity ^0.8.4;
 
 /// @notice A library for performing various math operations
 /// @author Kyle Scott (https://github.com/kyscott18/kyleswap2.5/blob/main/src/libraries/Math.sol)
-/// @author Modified from Solidly
+/// @author Modified from Uniswap (https://github.com/Uniswap/v2-core/blob/master/contracts/libraries/Math.sol)
 library Math {
-    function min(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a < b ? a : b;
-    }
-
     function sqrt(uint256 y) internal pure returns (uint256 z) {
         if (y > 3) {
             z = y;

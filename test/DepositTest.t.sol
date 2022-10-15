@@ -4,7 +4,6 @@ import "forge-std/console2.sol";
 
 import { TestHelper } from "./utils/TestHelper.sol";
 
-import { LendgineAddress } from "../src/libraries/LendgineAddress.sol";
 import { Position } from "../src/libraries/Position.sol";
 import { Tick } from "../src/libraries/Tick.sol";
 
@@ -15,18 +14,6 @@ import { CallbackHelper } from "./utils/CallbackHelper.sol";
 contract DepositTest is TestHelper {
     function setUp() public {
         _setUp();
-    }
-
-    function testAddress() public {
-        address estimate = LendgineAddress.computeAddress(
-            address(factory),
-            address(base),
-            address(speculative),
-            upperBound
-        );
-
-        assertEq(factory.getLendgine(address(base), address(speculative), upperBound), estimate);
-        assertEq(estimate, address(lendgine));
     }
 
     function testDeployParameters() public {

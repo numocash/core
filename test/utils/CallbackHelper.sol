@@ -4,23 +4,18 @@ import { IMintCallback } from "../../src/interfaces/IMintCallback.sol";
 
 import { Lendgine } from "../../src/Lendgine.sol";
 
-import { LendgineAddress } from "../../src/libraries/LendgineAddress.sol";
-
-import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
-import { ERC20 } from "solmate/tokens/ERC20.sol";
-import "forge-std/console2.sol";
+import { SafeTransferLib } from "./SafeTransferLib.sol";
 
 abstract contract CallbackHelper is IMintCallback {
     struct CallbackData {
-        LendgineAddress.LendgineKey key;
+        address speculative;
         address payer;
     }
 
     function MintCallback(uint256 amount, bytes calldata data) external override {
         CallbackData memory decoded = abi.decode(data, (CallbackData));
-        // CallbackValidation.verifyCallback(factory, decoded.poolKey);
 
-        if (amount > 0) pay(ERC20(decoded.key.speculative), decoded.payer, msg.sender, amount);
+        if (amount > 0) pay(decoded.speculative, decoded.payer, msg.sender, amount);
     }
 
     /// @param token The token to pay
@@ -28,7 +23,7 @@ abstract contract CallbackHelper is IMintCallback {
     /// @param recipient The entity that will receive payment
     /// @param value The amount to pay
     function pay(
-        ERC20 token,
+        address token,
         address payer,
         address recipient,
         uint256 value
