@@ -68,22 +68,6 @@ contract Pair is IPair {
     uint256 public override buffer;
 
     /*//////////////////////////////////////////////////////////////
-                           REENTRANCY LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    uint8 private locked = 1;
-
-    modifier lock() virtual {
-        if (locked != 1) revert ReentrancyError();
-
-        locked = 2;
-
-        _;
-
-        locked = 1;
-    }
-
-    /*//////////////////////////////////////////////////////////////
                                CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
@@ -118,7 +102,7 @@ contract Pair is IPair {
     }
 
     /// @inheritdoc IPair
-    function mint(uint256 liquidity) external override lock {
+    function mint(uint256 liquidity) external override {
         if (liquidity == 0) revert InsufficientOutputError();
 
         (uint256 balance0, uint256 balance1) = balances();
@@ -134,7 +118,7 @@ contract Pair is IPair {
         uint256 amount0,
         uint256 amount1,
         uint256 liquidity
-    ) external override lock {
+    ) external override {
         if (!verifyInvariant(amount0, amount1, liquidity)) revert InvariantError();
 
         if (amount0 == 0 && amount1 == 0) revert InsufficientOutputError();
@@ -151,7 +135,7 @@ contract Pair is IPair {
         address to,
         uint256 amount0Out,
         uint256 amount1Out
-    ) external override lock {
+    ) external override {
         if (amount0Out == 0 && amount1Out == 0) revert InsufficientOutputError();
 
         if (amount0Out > 0) SafeTransferLib.safeTransfer(base, to, amount0Out);
