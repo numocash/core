@@ -191,7 +191,7 @@ contract InvariantTest is TestHelper {
         uint256 rS = 8 ether;
         _pairMint(rB, rS, 1 ether, cuh);
 
-        uint256 amountSOut = 0.00001 ether;
+        uint256 amountSOut = 0.000000002 ether;
 
         uint256 a = (amountSOut * upperBound) / 10**18;
 

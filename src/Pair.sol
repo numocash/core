@@ -111,10 +111,10 @@ contract Pair {
         uint256 scale0 = (r0 * 10**18) / shares;
         uint256 scale1 = (r1 * 10**18) / shares;
 
-        uint256 a = scale0 * 10**9;
-        uint256 b = (upperBound * scale1) / 10**9;
-        uint256 c = (scale1**2) / (4 * 10**9);
-        uint256 d = upperBound**2 / 10**9;
+        uint256 a = scale0 * 10**18;
+        uint256 b = (upperBound * scale1);
+        uint256 c = (scale1**2) / (4);
+        uint256 d = upperBound**2;
 
         // console2.log("a", a);
         // console2.log("b", b);
@@ -122,7 +122,7 @@ contract Pair {
         // console2.log("d", d);
 
         if (a > d) revert BaseInvariantError();
-        if (scale1 > 2 * upperBound * 10**9) revert SpeculativeInvariantError();
+        if (scale1 > 2 * upperBound * 10**18) revert SpeculativeInvariantError();
 
         return a + b == c + d;
     }
