@@ -114,6 +114,7 @@ contract Lendgine is ERC20, JumpRate {
 
         if (shares == 0) revert InsufficientOutputError();
         if (liquidity + totalLiquidityBorrowed > totalLiquidity) revert CompleteUtilizationError();
+        if (totalSupply > 0 && totalLiquidityBorrowed == 0) revert CompleteUtilizationError();
 
         totalLiquidityBorrowed += liquidity;
 
@@ -210,7 +211,6 @@ contract Lendgine is ERC20, JumpRate {
                             ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    // TODO: when totalLiquidityBorrowed gets diluted down to zero
     function convertLiquidityToShare(uint256 liquidity) public view returns (uint256) {
         uint256 _totalLiquidityBorrowed = totalLiquidityBorrowed;
         return _totalLiquidityBorrowed == 0 ? liquidity : (liquidity * totalSupply) / _totalLiquidityBorrowed;
@@ -250,7 +250,7 @@ contract Lendgine is ERC20, JumpRate {
 
     /// @notice Helper function for accruing lendgine interest
     function _accrueInterest() private {
-        if (totalSupply == 0) {
+        if (totalSupply == 0 || totalLiquidityBorrowed == 0) {
             lastUpdate = uint64(block.timestamp);
             return;
         }
@@ -259,8 +259,7 @@ contract Lendgine is ERC20, JumpRate {
         uint256 _totalLiquidity = totalLiquidity; //SLOAD
 
         uint256 timeElapsed = block.timestamp - lastUpdate;
-        // TODO: check when totalLiqudityBorrowed = 0
-        if (timeElapsed == 0 || totalLiquidityBorrowed == 0) return;
+        if (timeElapsed == 0) return;
 
         // assuming dpr
         uint256 borrowRate = getBorrowRate(_totalLiquidityBorrowed, _totalLiquidity);

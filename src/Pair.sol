@@ -36,6 +36,8 @@ contract Pair is IPair {
 
     error SpeculativeInvariantError();
 
+    error BufferError();
+
     /*//////////////////////////////////////////////////////////////
                                IMMUTABLES
     //////////////////////////////////////////////////////////////*/
@@ -214,7 +216,7 @@ contract Pair is IPair {
     /// @inheritdoc IPair
     function addBuffer(uint256 amount) external override {
         if (msg.sender != lendgine) revert LendgineError();
-        // TODO: assert that there is enough totalSupply
+        if (amount + buffer > totalSupply) revert BufferError();
 
         buffer += amount;
     }
