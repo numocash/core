@@ -1,108 +1,96 @@
-// pragma solidity ^0.8.4;
+pragma solidity ^0.8.4;
 
-// import "forge-std/console2.sol";
+import "forge-std/console2.sol";
 
-// import { TestHelper } from "./utils/TestHelper.sol";
-// import { CallbackHelper } from "./utils/CallbackHelper.sol";
+import { TestHelper } from "./utils/TestHelper.sol";
+import { CallbackHelper } from "./utils/CallbackHelper.sol";
 
-// import { Position } from "../src/libraries/Position.sol";
-// import { Tick } from "../src/libraries/Tick.sol";
+import { Position } from "../src/libraries/Position.sol";
 
-// import { Factory } from "../src/Factory.sol";
-// import { Lendgine } from "../src/Lendgine.sol";
+import { Factory } from "../src/Factory.sol";
+import { Lendgine } from "../src/Lendgine.sol";
 
-// contract AccruePositionInterestTest is TestHelper {
-//     bytes32 public positionID;
+contract AccruePositionInterestTest is TestHelper {
+    function setUp() public {
+        _setUp();
 
-//     function setUp() public {
-//         _setUp();
+        _deposit(1 ether, 8 ether, 1 ether, cuh);
+    }
 
-//         _deposit(1 ether, 8 ether, 1 ether, 1, cuh);
+    function testAccrueInterestBasic() public {
+        lendgine.accruePositionInterest();
 
-//         positionID = Position.getID(cuh, 1);
-//     }
+        assertPosition(Position.Info({ liquidity: 1 ether, rewardPerLiquidityPaid: 0, tokensOwed: 0 }), cuh);
 
-//     function testAccrueInterestBasic() public {
-//         vm.prank(cuh);
-//         vm.expectRevert(Lendgine.UnutilizedAccrueError.selector);
-//         lendgine.accruePositionInterest(1);
-//     }
+        assertEq(lendgine.totalLiquidity(), 1 ether);
+        assertEq(lendgine.totalLiquidityBorrowed(), 0 ether);
+        assertEq(lendgine.rewardPerLiquidityStored(), 0);
+        assertEq(lendgine.lastUpdate(), 1);
 
-//     function testAccrueInterstNoTime() public {
-//         _mint(1 ether, cuh);
+        assertEq(pair.buffer(), 0 ether);
+        assertEq(pair.totalSupply(), 1 ether);
+    }
 
-//         vm.prank(cuh);
-//         lendgine.accruePositionInterest(1);
+    function testAccrueInterstNoTime() public {
+        _mint(1 ether, cuh);
 
-//         // Test lendgine token
-//         assertEq(lendgine.totalSupply(), 0.1 ether);
-//         assertEq(lendgine.balanceOf(cuh), 0.1 ether);
-//         assertEq(lendgine.balanceOf(address(lendgine)), 0 ether);
+        lendgine.accruePositionInterest();
 
-//         // Test base token
-//         assertEq(speculative.balanceOf(cuh), 0);
-//         assertEq(speculative.balanceOf(address(lendgine)), 1 ether);
+        // Test lendgine token
+        assertEq(lendgine.totalSupply(), 0.1 ether);
+        assertEq(lendgine.balanceOf(cuh), 0.1 ether);
+        assertEq(lendgine.balanceOf(address(lendgine)), 0 ether);
 
-//         assertPosition(Position.Info({ liquidity: 1 ether, rewardPerLiquidityPaid: 0, tokensOwed: 0 }), positionID);
+        // Test base token
+        assertEq(speculative.balanceOf(cuh), 0);
+        assertEq(speculative.balanceOf(address(lendgine)), 1 ether);
 
-//         assertTick(
-//             Tick.Info({ liquidity: 1 ether, rewardPerINPaid: 0, tokensOwedPerLiquidity: 0, prev: 0, next: 0 }),
-//             1
-//         );
+        assertPosition(Position.Info({ liquidity: 1 ether, rewardPerLiquidityPaid: 0, tokensOwed: 0 }), cuh);
 
-//         assertEq(lendgine.currentTick(), 1);
-//         assertEq(lendgine.currentLiquidity(), 0.1 ether);
-//         assertEq(lendgine.rewardPerINStored(), 0);
-//         assertEq(lendgine.lastUpdate(), 1);
-//         assertEq(lendgine.interestNumerator(), 0.1 ether);
-//         assertEq(lendgine.totalLiquidityBorrowed(), 0.1 ether);
-//     }
+        assertEq(lendgine.totalLiquidity(), 1 ether);
+        assertEq(lendgine.totalLiquidityBorrowed(), 0.1 ether);
+        assertEq(lendgine.rewardPerLiquidityStored(), 0);
+        assertEq(lendgine.lastUpdate(), 1);
 
-//     function testAccrueInterstTime() public {
-//         _mint(1 ether, cuh);
+        assertEq(pair.buffer(), 0.1 ether);
+        assertEq(pair.totalSupply(), 1 ether);
+    }
 
-//         vm.warp(1 days + 1);
+    function testAccrueInterstTime() public {
+        _mint(5 ether, cuh);
 
-//         vm.prank(cuh);
-//         lendgine.accruePositionInterest(1);
+        vm.warp(1 days + 1);
 
-//         uint256 dilution = 0.1 ether / 10000;
+        vm.prank(cuh);
+        lendgine.accruePositionInterest();
 
-//         // Test lendgine token
-//         assertEq(lendgine.totalSupply(), 0.1 ether);
-//         assertEq(lendgine.balanceOf(cuh), 0.1 ether);
-//         assertEq(lendgine.balanceOf(address(lendgine)), 0 ether);
+        uint256 dilutionLP = (0.5 ether * 145) / 1000;
 
-//         // Test base token
-//         assertEq(speculative.balanceOf(cuh), 0);
-//         assertEq(speculative.balanceOf(address(lendgine)), 1 ether);
+        // Test lendgine token
+        assertEq(lendgine.totalSupply(), 0.5 ether);
+        assertEq(lendgine.balanceOf(cuh), 0.5 ether);
+        assertEq(lendgine.balanceOf(address(lendgine)), 0 ether);
 
-//         assertPosition(
-//             Position.Info({ liquidity: 1 ether, rewardPerLiquidityPaid: dilution * 10, tokensOwed: dilution * 10 }),
-//             positionID
-//         );
+        // Test base token
+        assertEq(speculative.balanceOf(cuh), 0);
+        assertEq(speculative.balanceOf(address(lendgine)), 5 ether);
 
-//         assertTick(
-//             Tick.Info({
-//                 liquidity: 1 ether,
-//                 rewardPerINPaid: dilution * 100,
-//                 tokensOwedPerLiquidity: dilution * 10,
-//                 prev: 0,
-//                 next: 0
-//             }),
-//             1
-//         );
+        assertPosition(
+            Position.Info({ liquidity: 1 ether, rewardPerLiquidityPaid: dilutionLP * 10, tokensOwed: dilutionLP * 10 }),
+            cuh
+        );
 
-//         // Test global storage values
-//         assertEq(lendgine.currentTick(), 1);
-//         assertEq(lendgine.currentLiquidity(), 0.1 ether - dilution);
-//         assertEq(lendgine.rewardPerINStored(), (dilution * 10 * 1 ether) / (0.1 ether));
-//         assertEq(lendgine.lastUpdate(), 1 days + 1);
-//         assertEq(lendgine.interestNumerator(), 0.1 ether - dilution);
-//         assertEq(lendgine.totalLiquidityBorrowed(), 0.1 ether - dilution);
-//     }
+        // Test global storage values
+        assertEq(lendgine.totalLiquidity(), 1 ether);
+        assertEq(lendgine.totalLiquidityBorrowed(), 0.5 ether - dilutionLP);
+        assertEq(lendgine.rewardPerLiquidityStored(), (dilutionLP * 10));
+        assertEq(lendgine.lastUpdate(), 1 days + 1);
 
-//     // calling accrue interest twice
+        assertEq(pair.buffer(), 0.5 ether);
+        assertEq(pair.totalSupply(), 1 ether);
+    }
 
-//     // withdraw and receive correct amount
-// }
+    // calling accrue interest twice
+
+    // withdraw and receive correct amount
+}

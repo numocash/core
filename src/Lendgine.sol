@@ -280,7 +280,7 @@ contract Lendgine is ERC20, JumpRate {
     }
 
     /// @notice Helper function for accruing interest to a position
-    /// @dev Assume the `tick` interest is up to date
+    /// @dev Assume the global interest is up to date
     /// @param owner The address that this position belongs to
     function _accruePositionInterest(address owner) private {
         Position.Info storage position = positions[owner];
@@ -297,7 +297,7 @@ contract Lendgine is ERC20, JumpRate {
     }
 
     /// @notice Helper function for determining the amount of tokens owed to a position
-    /// @dev Assumes the `tick` interest is up to date
+    /// @dev Assumes the global interest is up to date
     function newTokensOwed(Position.Info memory position, uint256 _rewardPerLiquidity) private pure returns (uint256) {
         uint256 liquidity = position.liquidity;
 

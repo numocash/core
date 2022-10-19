@@ -27,9 +27,6 @@ contract BurnTest is TestHelper {
         assertEq(lendgine.balanceOf(cuh), 0.5 ether);
         assertEq(lendgine.balanceOf(address(lendgine)), 0 ether);
 
-        // // Test base token
-        assertEq(pair.buffer(), 0.5 ether);
-
         // Test speculative token
         assertEq(speculative.balanceOf(cuh), 5 ether);
         assertEq(speculative.balanceOf(address(lendgine)), 5 ether);
@@ -41,6 +38,10 @@ contract BurnTest is TestHelper {
         assertEq(lendgine.totalLiquidityBorrowed(), 0.5 ether);
         assertEq(lendgine.rewardPerLiquidityStored(), 0);
         assertEq(lendgine.lastUpdate(), 1);
+
+        // Test base token
+        assertEq(pair.buffer(), 0.5 ether);
+        assertEq(pair.totalSupply(), 1 ether);
     }
 
     function testBurnFull() public {
@@ -50,9 +51,6 @@ contract BurnTest is TestHelper {
         assertEq(lendgine.totalSupply(), 0 ether);
         assertEq(lendgine.balanceOf(cuh), 0 ether);
         assertEq(lendgine.balanceOf(address(lendgine)), 0 ether);
-
-        // Test pair token
-        assertEq(pair.buffer(), 0 ether);
 
         // Test speculative token
         assertEq(speculative.balanceOf(cuh), 10 ether);
@@ -65,6 +63,10 @@ contract BurnTest is TestHelper {
         assertEq(lendgine.totalLiquidityBorrowed(), 0 ether);
         assertEq(lendgine.rewardPerLiquidityStored(), 0);
         assertEq(lendgine.lastUpdate(), 1);
+
+        // Test pair token
+        assertEq(pair.buffer(), 0 ether);
+        assertEq(pair.totalSupply(), 1 ether);
     }
 
     function testZeroBurn() public {
