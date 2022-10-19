@@ -34,8 +34,6 @@ contract Pair is IPair {
 
     error InvariantError();
 
-    error BaseInvariantError();
-
     error SpeculativeInvariantError();
 
     /*//////////////////////////////////////////////////////////////
@@ -107,11 +105,10 @@ contract Pair is IPair {
         uint256 scale1 = (r1 * 10**18) / shares;
 
         uint256 a = scale0 * 10**18;
-        uint256 b = upperBound * scale1;
-        uint256 c = (scale1**2) / 4;
+        uint256 b = (upperBound * scale1);
+        uint256 c = (scale1**2) / (4);
         uint256 d = upperBound**2;
 
-        if (a > d) revert BaseInvariantError();
         if (scale1 > 2 * upperBound) revert SpeculativeInvariantError();
 
         return a + b == c + d;
