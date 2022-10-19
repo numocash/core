@@ -214,6 +214,7 @@ contract Pair is IPair {
     /// @inheritdoc IPair
     function addBuffer(uint256 amount) external override {
         if (msg.sender != lendgine) revert LendgineError();
+        // TODO: assert that there is enough totalSupply
 
         buffer += amount;
     }

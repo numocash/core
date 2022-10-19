@@ -4,22 +4,17 @@ pragma solidity ^0.8.0;
 import { Factory } from "./Factory.sol";
 import { Pair } from "./Pair.sol";
 import { ERC20 } from "./ERC20.sol";
+import { JumpRate } from "./JumpRate.sol";
 
 import { IMintCallback } from "./interfaces/IMintCallback.sol";
-import { ILendgine } from "./interfaces/ILendgine.sol";
 
 import { Position } from "./libraries/Position.sol";
-import { Tick } from "./libraries/Tick.sol";
-import { TickBitMaps } from "./libraries/TickBitMaps.sol";
 import { LiquidityMath } from "./libraries/LiquidityMath.sol";
 import { SafeTransferLib } from "./libraries/SafeTransferLib.sol";
 
-contract Lendgine is ILendgine, ERC20 {
-    using Position for mapping(bytes32 => Position.Info);
+contract Lendgine is ERC20, JumpRate {
+    using Position for mapping(address => Position.Info);
     using Position for Position.Info;
-    using Tick for mapping(uint16 => Tick.Info);
-    using Tick for Tick.Info;
-    using TickBitMaps for TickBitMaps.TickBitMap;
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -29,20 +24,13 @@ contract Lendgine is ILendgine, ERC20 {
 
     event Burn(address indexed sender, uint256 amountS, uint256 shares, uint256 liquidity, address indexed to);
 
-    event Deposit(address indexed sender, uint256 liquidity, uint16 tick, address indexed to);
+    event Deposit(address indexed sender, uint256 liquidity, address indexed to);
 
-    event Withdraw(address indexed sender, uint256 liquidity, uint16 tick);
+    event Withdraw(address indexed sender, uint256 liquidity);
 
-    event AccrueInterest(uint256 timeElapsed, uint256 amountS, uint256 liquidity, uint256 rewardPerIN);
+    event AccrueInterest(uint256 timeElapsed, uint256 amountS, uint256 liquidity, uint256 rewardPerLiquidity);
 
-    event AccrueTickInterest(uint16 indexed tick, uint256 rewardPerIN, uint256 tokensOwed);
-
-    event AccruePositionInterest(
-        uint16 indexed tick,
-        bytes32 indexed id,
-        uint256 rewardPerLiquidity,
-        uint256 tokensOwed
-    );
+    event AccruePositionInterest(address indexed owner, uint256 rewardPerLiquidity, uint256 tokensOwed);
 
     event Collect(address indexed owner, address indexed to, uint256 amountBase);
 
@@ -54,8 +42,6 @@ contract Lendgine is ILendgine, ERC20 {
 
     error BalanceReturnError();
 
-    error InvalidTick();
-
     error InsufficientInputError();
 
     error InsufficientOutputError();
@@ -64,51 +50,27 @@ contract Lendgine is ILendgine, ERC20 {
 
     error InsufficientPositionError();
 
-    error UnutilizedAccrueError();
-
     /*//////////////////////////////////////////////////////////////
                                IMMUTABLES
     //////////////////////////////////////////////////////////////*/
 
-    /// @inheritdoc ILendgine
-    uint16 public constant override MaxTick = 10_000;
+    address public immutable factory;
 
-    /// @inheritdoc ILendgine
-    address public immutable override factory;
-
-    /// @inheritdoc ILendgine
-    address public immutable override pair;
+    address public immutable pair;
 
     /*//////////////////////////////////////////////////////////////
                           LENDGINE STORAGE
     //////////////////////////////////////////////////////////////*/
 
-    /// @inheritdoc ILendgine
-    mapping(bytes32 => Position.Info) public override positions;
+    mapping(address => Position.Info) public positions;
 
-    /// @inheritdoc ILendgine
-    mapping(uint16 => Tick.Info) public override ticks;
+    uint256 public totalLiquidity;
 
-    /// @notice BitMap used for keeping track of which tick contain >0 liquidity
-    TickBitMaps.TickBitMap public tickBitMap;
+    uint256 public totalLiquidityBorrowed;
 
-    /// @inheritdoc ILendgine
-    uint256 public override currentLiquidity;
+    uint256 public rewardPerLiquidityStored;
 
-    /// @inheritdoc ILendgine
-    uint256 public override interestNumerator;
-
-    /// @inheritdoc ILendgine
-    uint256 public override totalLiquidityBorrowed;
-
-    /// @inheritdoc ILendgine
-    uint256 public override rewardPerINStored;
-
-    /// @inheritdoc ILendgine
-    uint64 public override lastUpdate;
-
-    /// @inheritdoc ILendgine
-    uint16 public override currentTick;
+    uint64 public lastUpdate;
 
     /*//////////////////////////////////////////////////////////////
                            REENTRANCY LOGIC
@@ -130,7 +92,7 @@ contract Lendgine is ILendgine, ERC20 {
                                CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
-    constructor() ERC20() {
+    constructor() {
         factory = msg.sender;
 
         pair = address(new Pair{ salt: keccak256(abi.encode(address(this))) }(msg.sender));
@@ -140,29 +102,20 @@ contract Lendgine is ILendgine, ERC20 {
                             MINT/BURN LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    /// @inheritdoc ILendgine
     function mint(
         address to,
         uint256 amountS,
         bytes calldata data
-    ) external override lock returns (uint256 shares) {
-        StateCache memory cache = loadCache();
-
-        _accrueInterest(cache);
-
-        if (tickBitMap.firstTick == 0) revert CompleteUtilizationError();
+    ) external lock returns (uint256 shares) {
+        _accrueInterest();
 
         uint256 liquidity = convertAssetToLiquidity(amountS);
         shares = convertLiquidityToShare(liquidity);
 
         if (shares == 0) revert InsufficientOutputError();
+        if (liquidity + totalLiquidityBorrowed > totalLiquidity) revert CompleteUtilizationError();
 
-        increaseCurrentLiquidity(liquidity, cache);
-
-        currentTick = cache.currentTick;
-        currentLiquidity = cache.currentLiquidity;
-        interestNumerator = cache.interestNumerator;
-        totalLiquidityBorrowed = cache.totalLiquidityBorrowed + liquidity;
+        totalLiquidityBorrowed += liquidity;
 
         _mint(to, shares); // optimistically mint
         Pair(pair).addBuffer(liquidity);
@@ -175,11 +128,8 @@ contract Lendgine is ILendgine, ERC20 {
         emit Mint(msg.sender, amountS, shares, liquidity, to);
     }
 
-    /// @inheritdoc ILendgine
-    function burn(address to) external override lock returns (uint256 amountS) {
-        StateCache memory cache = loadCache();
-
-        _accrueInterest(cache);
+    function burn(address to) external lock returns (uint256 amountS) {
+        _accrueInterest();
 
         uint256 shares = balanceOf[address(this)];
         uint256 liquidity = convertShareToLiquidity(shares);
@@ -187,12 +137,7 @@ contract Lendgine is ILendgine, ERC20 {
 
         if (liquidity == 0) revert InsufficientOutputError();
 
-        decreaseCurrentLiquidity(liquidity, cache);
-
-        interestNumerator = cache.interestNumerator;
-        totalLiquidityBorrowed = cache.totalLiquidityBorrowed - liquidity;
-        currentLiquidity = cache.currentLiquidity;
-        currentTick = cache.currentTick;
+        totalLiquidityBorrowed -= liquidity;
 
         _burn(address(this), shares);
         Pair(pair).removeBuffer(liquidity);
@@ -205,129 +150,51 @@ contract Lendgine is ILendgine, ERC20 {
                         DEPOSIT/WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    /// @inheritdoc ILendgine
-    function deposit(address to, uint16 tick) external override lock {
-        StateCache memory cache = loadCache();
+    function deposit(address to) external lock {
+        _accrueInterest();
 
         uint256 liquidity = Pair(pair).buffer();
 
         if (liquidity == 0) revert InsufficientOutputError();
-        if (tick == 0 || tick > MaxTick) revert InvalidTick();
 
-        bytes32 id = Position.getID(to, tick);
-
-        bool utilized = (cache.currentTick == tick && cache.currentLiquidity > 0) || (tick < cache.currentTick);
-        if (utilized) {
-            _accrueInterest(cache);
-            if (tick != cache.currentTick) _accrueTickInterest(tick, cache);
-            _accruePositionInterest(id, tick);
-        }
-
-        updateTick(tick, int256(liquidity));
-        positions.update(id, int256(liquidity));
-
-        if (tick < cache.currentTick) {
-            cache.interestNumerator += liquidity * tick;
-            decreaseCurrentLiquidity(liquidity, cache);
-
-            interestNumerator = cache.interestNumerator;
-            currentLiquidity = cache.currentLiquidity;
-            currentTick = cache.currentTick;
-        }
+        positions.update(to, int256(liquidity));
+        totalLiquidity += liquidity;
 
         Pair(pair).removeBuffer(liquidity);
-        emit Deposit(msg.sender, liquidity, tick, to);
+        emit Deposit(msg.sender, liquidity, to);
     }
 
-    /// @inheritdoc ILendgine
-    function withdraw(uint16 tick, uint256 liquidity) external override lock {
-        StateCache memory cache = loadCache();
+    function withdraw(uint256 liquidity) external lock {
+        _accrueInterest();
 
         if (liquidity == 0) revert InsufficientOutputError();
-        if (tick == 0 || tick > MaxTick) revert InvalidTick();
-
-        bytes32 id = Position.getID(msg.sender, tick);
-        Position.Info memory positionInfo = positions.get(msg.sender, tick);
-        Tick.Info memory tickInfo = ticks[tick];
+        Position.Info memory positionInfo = positions.get(msg.sender);
 
         if (liquidity > positionInfo.liquidity) revert InsufficientPositionError();
+        if (totalLiquidityBorrowed > totalLiquidity - liquidity) revert CompleteUtilizationError();
 
-        if ((cache.currentTick == tick && cache.currentLiquidity > 0) || (tick < cache.currentTick)) {
-            _accrueInterest(cache);
-            if (tick != cache.currentTick) _accrueTickInterest(tick, cache);
-            _accruePositionInterest(id, tick);
-        }
-
-        uint256 utilizedLiquidity = 0;
-        uint256 remainingLiquidity = tickInfo.liquidity - liquidity;
-        if (tick < cache.currentTick) {
-            utilizedLiquidity = liquidity;
-        } else if (tick == cache.currentTick && cache.currentLiquidity > remainingLiquidity) {
-            utilizedLiquidity = cache.currentLiquidity - remainingLiquidity;
-
-            cache.currentTick = tickInfo.next;
-            cache.currentLiquidity = 0;
-        }
-
-        // Remove position from the data structure
-        updateTick(tick, -int256(liquidity));
-        positions.update(id, -int256(liquidity));
-
-        // Replace if we removed utilized liquidity
-        if (utilizedLiquidity > 0) {
-            cache.interestNumerator -= utilizedLiquidity * tick;
-
-            increaseCurrentLiquidity(utilizedLiquidity, cache);
-
-            currentTick = cache.currentTick;
-            currentLiquidity = cache.currentLiquidity;
-            interestNumerator = cache.interestNumerator;
-        }
+        positions.update(msg.sender, -int256(liquidity));
+        totalLiquidity -= liquidity;
 
         Pair(pair).addBuffer(liquidity);
-        emit Withdraw(msg.sender, liquidity, tick);
+        emit Withdraw(msg.sender, liquidity);
     }
 
     /*//////////////////////////////////////////////////////////////
                             INTEREST LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    /// @inheritdoc ILendgine
-    function accrueInterest() external override lock {
-        StateCache memory cache = loadCache();
-        _accrueInterest(cache);
+    function accrueInterest() external lock {
+        _accrueInterest();
     }
 
-    /// @inheritdoc ILendgine
-    function accrueTickInterest(uint16 tick) external override lock {
-        if (tick == 0 || tick > MaxTick) revert InvalidTick();
-        StateCache memory cache = loadCache();
-
-        _accrueInterest(cache);
-        if (tick != currentTick) _accrueTickInterest(tick, cache);
+    function accruePositionInterest() external lock {
+        _accrueInterest();
+        _accruePositionInterest(msg.sender);
     }
 
-    /// @inheritdoc ILendgine
-    function accruePositionInterest(uint16 tick) external override lock {
-        if (tick == 0) revert InvalidTick();
-
-        bytes32 id = Position.getID(msg.sender, tick);
-        StateCache memory cache = loadCache();
-
-        _accrueInterest(cache);
-        if (tick != currentTick) _accrueTickInterest(tick, cache);
-        _accruePositionInterest(id, tick);
-    }
-
-    /// @inheritdoc ILendgine
-    function collect(
-        address to,
-        uint16 tick,
-        uint256 amountSRequested
-    ) external override lock returns (uint256 amountS) {
-        if (tick == 0 || tick > MaxTick) revert InvalidTick();
-
-        Position.Info storage position = positions.get(msg.sender, tick);
+    function collect(address to, uint256 amountSRequested) external lock returns (uint256 amountS) {
+        Position.Info storage position = positions.get(msg.sender);
 
         amountS = amountSRequested > position.tokensOwed ? position.tokensOwed : amountSRequested;
 
@@ -343,54 +210,29 @@ contract Lendgine is ILendgine, ERC20 {
                             ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    /// @inheritdoc ILendgine
-    function convertLiquidityToShare(uint256 liquidity) public view override returns (uint256) {
+    // TODO: when totalLiquidityBorrowed gets diluted down to zero
+    function convertLiquidityToShare(uint256 liquidity) public view returns (uint256) {
         uint256 _totalLiquidityBorrowed = totalLiquidityBorrowed;
         return _totalLiquidityBorrowed == 0 ? liquidity : (liquidity * totalSupply) / _totalLiquidityBorrowed;
     }
 
-    /// @inheritdoc ILendgine
-    function convertShareToLiquidity(uint256 shares) public view override returns (uint256) {
+    function convertShareToLiquidity(uint256 shares) public view returns (uint256) {
         return (totalLiquidityBorrowed * shares) / totalSupply;
     }
 
-    /// @inheritdoc ILendgine
-    function convertAssetToLiquidity(uint256 assets) public view override returns (uint256) {
+    function convertAssetToLiquidity(uint256 assets) public view returns (uint256) {
         return (assets * 10**18) / (2 * Pair(pair).upperBound());
     }
 
-    /// @inheritdoc ILendgine
-    function convertLiquidityToAsset(uint256 liquidity) public view override returns (uint256) {
+    function convertLiquidityToAsset(uint256 liquidity) public view returns (uint256) {
         return (2 * liquidity * Pair(pair).upperBound()) / 10**18;
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                             STATE CACHE
-    //////////////////////////////////////////////////////////////*/
-
-    struct StateCache {
-        uint256 currentLiquidity;
-        uint256 interestNumerator;
-        uint256 totalLiquidityBorrowed;
-        uint16 currentTick;
-    }
-
-    function loadCache() private view returns (StateCache memory) {
-        return
-            StateCache({
-                currentTick: currentTick,
-                currentLiquidity: currentLiquidity,
-                interestNumerator: interestNumerator,
-                totalLiquidityBorrowed: totalLiquidityBorrowed
-            });
     }
 
     /*//////////////////////////////////////////////////////////////
                                  VIEW
     //////////////////////////////////////////////////////////////*/
 
-    /// @inheritdoc ILendgine
-    function balanceSpeculative() public view override returns (uint256) {
+    function balanceSpeculative() public view returns (uint256) {
         bool success;
         bytes memory data;
 
@@ -403,201 +245,62 @@ contract Lendgine is ILendgine, ERC20 {
     }
 
     /*//////////////////////////////////////////////////////////////
-                         INTERNAL LIQUIDITY LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Updates a tick with the given liquidityDelta
-    /// @param tick The index of the tick to update
-    function updateTick(uint16 tick, int256 liquidityDelta) private {
-        Tick.Info storage info = ticks[tick];
-
-        bool init = info.liquidity == 0;
-        info.liquidity = LiquidityMath.addDelta(info.liquidity, liquidityDelta);
-        bool uninit = info.liquidity == 0;
-
-        if (init) {
-            if (tickBitMap.firstTick == 0) {
-                tickBitMap.firstTick = tick;
-            } else if (tick < tickBitMap.firstTick) {
-                ticks[tickBitMap.firstTick].prev = tick;
-                info.next = tickBitMap.firstTick;
-                tickBitMap.firstTick = tick;
-            } else {
-                uint16 below = tickBitMap.below(tick);
-                uint16 above = ticks[below].next;
-                info.prev = below;
-                info.next = above;
-                ticks[below].next = tick;
-                ticks[above].prev = tick;
-            }
-
-            tickBitMap.flipTick(tick, true);
-        } else if (uninit) {
-            if (tick == tickBitMap.firstTick) {
-                tickBitMap.firstTick = info.next;
-                ticks[info.next].prev = 0;
-            } else {
-                uint16 below = info.prev;
-                uint16 above = info.next;
-                ticks[below].next = above;
-                ticks[above].prev = below;
-            }
-
-            tickBitMap.flipTick(tick, false);
-            delete ticks[tick];
-        }
-    }
-
-    /// @notice Increases the amount of borrowed liquidity in a sorted order, borrowing the liquidity
-    /// with the lowest interest rate first
-    function increaseCurrentLiquidity(uint256 liquidity, StateCache memory cache) private view {
-        if (cache.currentTick == 0) cache.currentTick = tickBitMap.firstTick;
-
-        Tick.Info memory currentTickInfo = ticks[cache.currentTick];
-
-        // amount of liquidity in this tick available
-        uint256 remainingCurrentLiquidity = currentTickInfo.liquidity - cache.currentLiquidity;
-        // amount of pair lp tokens to be added
-        uint256 remainingLP = liquidity;
-
-        while (true) {
-            if (remainingCurrentLiquidity >= remainingLP) {
-                break;
-            } else {
-                if (cache.currentTick == MaxTick) revert CompleteUtilizationError();
-
-                cache.interestNumerator += cache.currentTick * remainingCurrentLiquidity;
-                cache.currentTick = currentTickInfo.next;
-
-                currentTickInfo = ticks[cache.currentTick];
-                remainingLP -= remainingCurrentLiquidity;
-                remainingCurrentLiquidity = currentTickInfo.liquidity;
-            }
-        }
-
-        cache.interestNumerator += cache.currentTick * remainingLP;
-        cache.currentLiquidity += remainingLP;
-    }
-
-    /// @notice Decrease the amount of borrowed liquidity in a sorted order, repaying the liquidity
-    /// with the highest interest rate first
-    function decreaseCurrentLiquidity(uint256 liquidity, StateCache memory cache) private {
-        Tick.Info memory currentTickInfo = ticks[cache.currentTick];
-
-        uint256 remainingCurrentLiquidity = cache.currentLiquidity;
-        uint256 remainingLP = liquidity;
-
-        while (true) {
-            if (remainingCurrentLiquidity >= remainingLP) {
-                break;
-            } else {
-                cache.interestNumerator -= cache.currentTick * remainingCurrentLiquidity;
-                cache.currentTick = currentTickInfo.prev;
-
-                currentTickInfo = ticks[cache.currentTick];
-                remainingLP -= remainingCurrentLiquidity;
-                remainingCurrentLiquidity = currentTickInfo.liquidity;
-
-                _accrueTickInterest(cache.currentTick, cache);
-            }
-        }
-        cache.interestNumerator -= cache.currentTick * remainingLP;
-        cache.currentLiquidity = remainingCurrentLiquidity - remainingLP;
-    }
-
-    /*//////////////////////////////////////////////////////////////
                          INTERNAL INTEREST LOGIC
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Helper function for accruing lendgine interest
-    function _accrueInterest(StateCache memory cache) private {
+    function _accrueInterest() private {
         if (totalSupply == 0) {
             lastUpdate = uint64(block.timestamp);
             return;
         }
 
-        uint256 timeElapsed = block.timestamp - lastUpdate;
-        if (timeElapsed == 0 || cache.interestNumerator == 0) return;
+        uint256 _totalLiquidityBorrowed = totalLiquidityBorrowed; // SLOAD
+        uint256 _totalLiquidity = totalLiquidity; //SLOAD
 
-        uint256 dilutionLPRequested = (cache.interestNumerator * timeElapsed) / (1 days * 10_000);
-        uint256 dilutionLP = dilutionLPRequested > cache.totalLiquidityBorrowed
-            ? cache.totalLiquidityBorrowed
+        uint256 timeElapsed = block.timestamp - lastUpdate;
+        // TODO: check when totalLiqudityBorrowed = 0
+        if (timeElapsed == 0 || totalLiquidityBorrowed == 0) return;
+
+        // assuming dpr
+        uint256 borrowRate = getBorrowRate(_totalLiquidityBorrowed, _totalLiquidity);
+
+        uint256 dilutionLPRequested = (borrowRate * _totalLiquidityBorrowed * timeElapsed) / (1 ether * 1 days);
+        uint256 dilutionLP = dilutionLPRequested > _totalLiquidityBorrowed
+            ? _totalLiquidityBorrowed
             : dilutionLPRequested;
 
         uint256 dilutionSpeculative = convertLiquidityToAsset(dilutionLP);
-        rewardPerINStored += (dilutionSpeculative * 1 ether) / cache.interestNumerator;
+        rewardPerLiquidityStored += (dilutionSpeculative * 1 ether) / _totalLiquidity;
 
-        _accrueTickInterest(currentTick, cache);
-
-        decreaseCurrentLiquidity(dilutionLP, cache);
-
-        totalLiquidityBorrowed = cache.totalLiquidityBorrowed - dilutionLP;
-        interestNumerator = cache.interestNumerator;
-        currentLiquidity = cache.currentLiquidity;
-        currentTick = cache.currentTick;
+        totalLiquidityBorrowed = _totalLiquidityBorrowed - dilutionLP;
         lastUpdate = uint64(block.timestamp);
 
-        emit AccrueInterest(timeElapsed, dilutionSpeculative, dilutionLP, rewardPerINStored);
-    }
-
-    /// @notice Helper function for accruing interest to a position
-    /// @dev Assumes the lendgine total interest is up to date
-    /// @param tick The tick index to accrue interst to
-    function _accrueTickInterest(uint16 tick, StateCache memory cache) private {
-        if (tick > cache.currentTick || (tick == cache.currentTick && cache.currentLiquidity == 0))
-            revert UnutilizedAccrueError();
-
-        Tick.Info storage tickInfo = ticks[tick];
-        Tick.Info memory _tickInfo = tickInfo;
-
-        uint256 tokensOwed = newTokensOwed(_tickInfo, tick);
-
-        tickInfo.rewardPerINPaid = rewardPerINStored;
-        if (tokensOwed > 0)
-            tickInfo.tokensOwedPerLiquidity =
-                _tickInfo.tokensOwedPerLiquidity +
-                ((tokensOwed * 1 ether) / _tickInfo.liquidity);
-
-        emit AccrueTickInterest(tick, rewardPerINStored, tokensOwed);
+        emit AccrueInterest(timeElapsed, dilutionSpeculative, dilutionLP, rewardPerLiquidityStored);
     }
 
     /// @notice Helper function for accruing interest to a position
     /// @dev Assume the `tick` interest is up to date
-    /// @param id Position ID that is being accrued
-    /// @param tick The tick index that this position belongs to
-    function _accruePositionInterest(bytes32 id, uint16 tick) private {
-        Position.Info storage position = positions[id];
+    /// @param owner The address that this position belongs to
+    function _accruePositionInterest(address owner) private {
+        Position.Info storage position = positions[owner];
         Position.Info memory _position = position;
 
-        Tick.Info storage tickInfo = ticks[tick];
-        Tick.Info memory _tickInfo = tickInfo;
+        uint256 _rewardPerLiquidityStored = rewardPerLiquidityStored; // SLOAD
 
-        uint256 tokensOwed = newTokensOwed(_position, _tickInfo);
+        uint256 tokensOwed = newTokensOwed(_position, _rewardPerLiquidityStored);
 
-        position.rewardPerLiquidityPaid = _tickInfo.tokensOwedPerLiquidity;
+        position.rewardPerLiquidityPaid = _rewardPerLiquidityStored;
         position.tokensOwed = _position.tokensOwed + tokensOwed;
 
-        emit AccruePositionInterest(tick, id, _tickInfo.tokensOwedPerLiquidity, tokensOwed);
-    }
-
-    /// @notice Helper function for determining amount of tokens owed to a tick
-    /// @dev Assumes the lendgine total interest is up to date
-    function newTokensOwed(Tick.Info memory tickInfo, uint16 tick) private view returns (uint256) {
-        if (tick > currentTick) return 0;
-
-        uint256 liquidity = tickInfo.liquidity;
-        if (currentTick == tick) {
-            liquidity = currentLiquidity;
-        }
-
-        return (liquidity * tick * (rewardPerINStored - tickInfo.rewardPerINPaid)) / 1 ether;
+        emit AccruePositionInterest(owner, _rewardPerLiquidityStored, tokensOwed);
     }
 
     /// @notice Helper function for determining the amount of tokens owed to a position
     /// @dev Assumes the `tick` interest is up to date
-    function newTokensOwed(Position.Info memory position, Tick.Info memory tickInfo) private pure returns (uint256) {
+    function newTokensOwed(Position.Info memory position, uint256 _rewardPerLiquidity) private pure returns (uint256) {
         uint256 liquidity = position.liquidity;
 
-        return (liquidity * (tickInfo.tokensOwedPerLiquidity - position.rewardPerLiquidityPaid)) / (1 ether);
+        return (liquidity * (_rewardPerLiquidity - position.rewardPerLiquidityPaid)) / (1 ether);
     }
 }

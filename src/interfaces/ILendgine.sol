@@ -6,9 +6,6 @@ pragma solidity >=0.5.0;
 /// @author Modified from Uniswap (https://github.com/Uniswap/v3-core/blob/main/contracts/UniswapV3Pool.sol)
 /// and Primitive (https://github.com/primitivefinance/rmm-core/blob/main/contracts/PrimitiveEngine.sol)
 interface ILendgine {
-    /// @notice The maximum allowed interest rate tick
-    function MaxTick() external view returns (uint16);
-
     /// @notice The contract that deployed the lendgine
     function factory() external view returns (address);
 
@@ -23,18 +20,6 @@ interface ILendgine {
             uint256,
             uint256,
             uint256
-        );
-
-    /// @notice Returns information about a tick by the tick's index
-    function ticks(uint16 index)
-        external
-        view
-        returns (
-            uint256,
-            uint256,
-            uint256,
-            uint16,
-            uint16
         );
 
     /// @notice The liquidity in the `currentTick`
