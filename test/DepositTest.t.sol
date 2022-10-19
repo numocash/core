@@ -5,7 +5,6 @@ import "forge-std/console2.sol";
 import { TestHelper } from "./utils/TestHelper.sol";
 
 import { Position } from "../src/libraries/Position.sol";
-import { Tick } from "../src/libraries/Tick.sol";
 
 import { Factory } from "../src/Factory.sol";
 import { Lendgine } from "../src/Lendgine.sol";
@@ -25,31 +24,15 @@ contract DepositTest is TestHelper {
         assertEq(pair.upperBound(), upperBound);
     }
 
-    function testPositionID() public {
-        bytes32 positionID = Position.getID(cuh, 1);
-
-        bytes32 estimate = keccak256(abi.encode(cuh, 1));
-
-        assertEq(positionID, estimate);
-    }
-
     function testPositionsInit() public {
-        _deposit(1 ether, 8 ether, 1 ether, 1, cuh);
+        _deposit(1 ether, 8 ether, 1 ether, cuh);
 
-        bytes32 positionID = Position.getID(cuh, 1);
+        assertPosition(Position.Info({ liquidity: 1 ether, rewardPerLiquidityPaid: 0, tokensOwed: 0 }), cuh);
 
-        assertPosition(Position.Info({ liquidity: 1 ether, rewardPerLiquidityPaid: 0, tokensOwed: 0 }), positionID);
-
-        assertTick(
-            Tick.Info({ liquidity: 1 ether, rewardPerINPaid: 0, tokensOwedPerLiquidity: 0, prev: 0, next: 0 }),
-            1
-        );
-
-        assertEq(lendgine.currentTick(), 0);
-        assertEq(lendgine.currentLiquidity(), 0);
-        assertEq(lendgine.rewardPerINStored(), 0);
-        assertEq(lendgine.lastUpdate(), 0);
-        assertEq(lendgine.interestNumerator(), 0);
+        assertEq(lendgine.totalLiquidity(), 1 ether);
+        assertEq(lendgine.totalLiquidityBorrowed(), 0);
+        assertEq(lendgine.rewardPerLiquidityStored(), 0);
+        assertEq(lendgine.lastUpdate(), 1);
 
         assertEq(pair.buffer(), 0 ether);
         assertEq(pair.totalSupply(), 1 ether);
@@ -57,6 +40,6 @@ contract DepositTest is TestHelper {
 
     function testZeroMint() public {
         vm.expectRevert(Lendgine.InsufficientOutputError.selector);
-        lendgine.deposit(cuh, 1);
+        lendgine.deposit(cuh);
     }
 }

@@ -34,11 +34,11 @@ library Position {
 
     /// @notice Add or remove liquidity from a position
     function update(
-        mapping(bytes32 => Position.Info) storage self,
-        bytes32 id,
+        mapping(address => Position.Info) storage self,
+        address owner,
         int256 liquidityDelta
     ) internal {
-        Position.Info storage info = self[id];
+        Position.Info storage info = self[owner];
 
         if (liquidityDelta == 0) revert NoLiquidityError();
 
@@ -50,16 +50,11 @@ library Position {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Return a position identified by its owner and tick
-    function get(
-        mapping(bytes32 => Info) storage self,
-        address owner,
-        uint16 tick
-    ) internal view returns (Position.Info storage position) {
-        position = self[getID(owner, tick)];
-    }
-
-    /// @notice Computer the unique identifier for a position based on the owner and tick
-    function getID(address owner, uint16 tick) internal pure returns (bytes32 id) {
-        id = keccak256(abi.encode(owner, tick));
+    function get(mapping(address => Info) storage self, address owner)
+        internal
+        view
+        returns (Position.Info storage position)
+    {
+        position = self[owner];
     }
 }

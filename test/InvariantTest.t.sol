@@ -131,7 +131,7 @@ contract InvariantTest is TestHelper {
     }
 
     function testDouble() public {
-        _deposit(1 ether, 8 ether, 1 ether, 1, cuh);
+        _deposit(1 ether, 8 ether, 1 ether, cuh);
         _pairMint(1_000_000, 8_000_000, 1_000_000, dennis);
 
         assertEq(pair.totalSupply(), 1 ether + 1_000_000);
@@ -145,7 +145,7 @@ contract InvariantTest is TestHelper {
         assertEq(pair.buffer(), 0);
         assertEq(pair.totalSupply(), 1 ether);
 
-        _withdraw(1 ether, 1, cuh);
+        _withdraw(1 ether, cuh);
 
         assertEq(pair.buffer(), 1 ether);
         assertEq(pair.totalSupply(), 1 ether);
@@ -262,7 +262,7 @@ contract InvariantTest is TestHelper {
     }
 
     function testMintWithDonation() public {
-        _deposit(9 ether, 4 ether, 1 ether, 1, cuh);
+        _deposit(9 ether, 4 ether, 1 ether, cuh);
 
         base.mint(address(pair), 9 ether);
         speculative.mint(address(pair), 4 ether);
@@ -277,7 +277,7 @@ contract InvariantTest is TestHelper {
         assertEq(pair.totalSupply(), 1 ether);
         assertEq(pair.buffer(), 0);
 
-        _withdraw(1 ether, 1, cuh);
+        _withdraw(1 ether, cuh);
 
         assertEq(pair.buffer(), 1 ether);
         assertEq(pair.totalSupply(), 1 ether);
