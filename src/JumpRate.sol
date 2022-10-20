@@ -1,13 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.0;
 
-abstract contract JumpRate {
-    uint256 public constant baseRate = 0.02 ether;
-    uint256 public constant kink = 0.8 ether;
-    uint256 public constant multiplier = 0.25 ether;
-    uint256 public constant jumpMultiplier = 4 ether;
+import { IJumpRate } from "./interfaces/IJumpRate.sol";
 
-    function getBorrowRate(uint256 borrowedLiquidity, uint256 totalLiquidity) public pure returns (uint256 rate) {
+abstract contract JumpRate is IJumpRate {
+    uint256 public constant override baseRate = 0.02 ether;
+    uint256 public constant override kink = 0.8 ether;
+    uint256 public constant override multiplier = 0.25 ether;
+    uint256 public constant override jumpMultiplier = 4 ether;
+
+    function getBorrowRate(uint256 borrowedLiquidity, uint256 totalLiquidity)
+        public
+        pure
+        override
+        returns (uint256 rate)
+    {
         uint256 util = utilizationRate(borrowedLiquidity, totalLiquidity);
 
         if (util <= kink) {
@@ -19,14 +26,19 @@ abstract contract JumpRate {
         }
     }
 
-    function getSupplyRate(uint256 borrowedLiquidity, uint256 totalLiquidity) external pure returns (uint256 rate) {
+    function getSupplyRate(uint256 borrowedLiquidity, uint256 totalLiquidity)
+        external
+        pure
+        override
+        returns (uint256 rate)
+    {
         uint256 util = utilizationRate(borrowedLiquidity, totalLiquidity);
         uint256 borrowRate = getBorrowRate(borrowedLiquidity, totalLiquidity);
 
         return (borrowRate * util) / 1 ether;
     }
 
-    function utilizationRate(uint256 borrowedLiquidity, uint256 totalLiquidity) internal pure returns (uint256 rate) {
+    function utilizationRate(uint256 borrowedLiquidity, uint256 totalLiquidity) private pure returns (uint256 rate) {
         if (totalLiquidity == 0) return 0;
         return (borrowedLiquidity * 1 ether) / totalLiquidity;
     }
