@@ -9,7 +9,11 @@ import { Factory } from "../src/Factory.sol";
 import { Lendgine } from "../src/Lendgine.sol";
 import { Pair } from "../src/Pair.sol";
 
+import { FullMath } from "../src/libraries/FullMath.sol";
+
 contract InvariantTest is TestHelper {
+    uint256 public constant maxTokens = type(uint256).max;
+
     function setUp() public {
         _setUp();
     }
@@ -40,7 +44,7 @@ contract InvariantTest is TestHelper {
         uint256 scale = 1 ether; // r0 / $, 1 ether of r0 per dollar
 
         console2.log("price of 1 ether LP in $:", value / scale);
-        console2.log("max TVL of pool in $", (value * 2**120) / (scale * 1 ether));
+        console2.log("max TVL of pool in $", FullMath.mulDiv(value, maxTokens, scale * 1 ether));
     }
 
     function testLPPriceLow() public {
@@ -54,7 +58,7 @@ contract InvariantTest is TestHelper {
         uint256 scale = 1 ether; // r0 / $, 1 ether of r0 per dollar
 
         console2.log("price of 1 ether LP in $:", value / scale);
-        console2.log("max TVL of pool in $", (value * 2**120) / (scale * 1 ether));
+        console2.log("max TVL of pool in $", FullMath.mulDiv(value, maxTokens, scale * 1 ether));
     }
 
     function testLpPriceMax() public {
@@ -68,7 +72,7 @@ contract InvariantTest is TestHelper {
         uint256 scale = 1 ether; // r0 / $, 1 ether of r0 per dollar
 
         console2.log("price of 1 ether LP in $:", value / scale);
-        console2.log("max TVL of pool in $", (value * 2**120) / (scale * 1 ether));
+        console2.log("max TVL of pool in $", FullMath.mulDiv(value, maxTokens, scale * 1 ether));
     }
 
     function testPricePrecision() public {
@@ -105,7 +109,7 @@ contract InvariantTest is TestHelper {
         uint256 scale = 10**24; // r0 / $, 1 ether of r0 per dollar
 
         console2.log("price of 1 ether LP in $", value / scale);
-        console2.log("max TVL of pool in $", (2**120 / scale) * (value / 1 ether));
+        console2.log("max TVL of pool in $", (maxTokens / scale) * (value / 1 ether));
     }
 
     function testHighUpperBoundLow() public {
@@ -133,7 +137,7 @@ contract InvariantTest is TestHelper {
         uint256 scale = 10**24; // r0 / $, 1 ether of r0 per dollar
 
         console2.log("price of 1 ether LP in $", value / scale);
-        console2.log("max TVL of pool in $", (2**120 / scale) * (value / 1 ether));
+        console2.log("max TVL of pool in $", FullMath.mulDiv(value, maxTokens, scale * 1 ether));
     }
 
     // // price can't be lower than 10**9
@@ -160,7 +164,7 @@ contract InvariantTest is TestHelper {
         uint256 scale = 10**12; // r0 / $, 1 ether of r0 per dollar
 
         console2.log("price of 1 ether LP in $", value / scale);
-        console2.log("max TVL of pool in $", ((2**120 / scale) * value) / 1 ether);
+        console2.log("max TVL of pool in $", FullMath.mulDiv(value, maxTokens, scale * 1 ether));
     }
 
     function testLowUpperBoundLow() public {
@@ -189,6 +193,6 @@ contract InvariantTest is TestHelper {
         uint256 scale = 10**12; // r0 / $, 1 ether of r0 per dollar
 
         console2.log("price of 1 ether LP in $", value / scale);
-        console2.log("max TVL of pool in $", ((2**120 / scale) * value) / 1 ether);
+        console2.log("max TVL of pool in $", FullMath.mulDiv(value, maxTokens, scale * 1 ether));
     }
 }
