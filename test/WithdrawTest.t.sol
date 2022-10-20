@@ -54,4 +54,25 @@ contract WithdrawTest is TestHelper {
         vm.expectRevert(Lendgine.InsufficientPositionError.selector);
         _withdraw(2 ether, cuh);
     }
+
+    function testUtilizedWithdraw() public {
+        _mint(5 ether, cuh);
+        _withdraw(0.5 ether, cuh);
+
+        assertPosition(Position.Info({ liquidity: 0.5 ether, rewardPerLiquidityPaid: 0, tokensOwed: 0 }), cuh);
+
+        assertEq(lendgine.totalLiquidity(), 0.5 ether);
+        assertEq(lendgine.totalLiquidityBorrowed(), 0.5 ether);
+        assertEq(lendgine.rewardPerLiquidityStored(), 0);
+        assertEq(lendgine.lastUpdate(), 1);
+
+        assertEq(pair.buffer(), 1 ether);
+        assertEq(pair.totalSupply(), 1 ether);
+    }
+
+    function testCompleteUtilizationError() public {
+        _mint(5 ether, cuh);
+        vm.expectRevert(Lendgine.CompleteUtilizationError.selector);
+        _withdraw(0.5 ether + 1, cuh);
+    }
 }

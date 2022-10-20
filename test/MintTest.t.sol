@@ -49,7 +49,6 @@ contract MintTest is TestHelper {
         );
     }
 
-    // TODO: test donations to the pool and extra mints
     // TODO: test insufficient inputs in a different file
 
     function testExtraMint() public {
@@ -66,6 +65,27 @@ contract MintTest is TestHelper {
             amountS,
             abi.encode(CallbackHelper.CallbackData({ speculative: address(speculative), payer: cuh }))
         );
+    }
+
+    function testRoundingDown() public {
+        _mint(10 ether + 9, cuh);
+
+        // Test lendgine token
+        assertEq(lendgine.totalSupply(), 1 ether);
+        assertEq(lendgine.balanceOf(cuh), 1 ether);
+        assertEq(lendgine.balanceOf(address(lendgine)), 0 ether);
+
+        assertPosition(Position.Info({ liquidity: 1 ether, rewardPerLiquidityPaid: 0, tokensOwed: 0 }), cuh);
+
+        // Test global storage values
+        assertEq(lendgine.totalLiquidity(), 1 ether);
+        assertEq(lendgine.totalLiquidityBorrowed(), 1 ether);
+        assertEq(lendgine.rewardPerLiquidityStored(), 0);
+        assertEq(lendgine.lastUpdate(), 1);
+
+        // Test pair token
+        assertEq(pair.buffer(), 1 ether);
+        assertEq(pair.totalSupply(), 1 ether);
     }
 
     function testEmptyMint() public {

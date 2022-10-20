@@ -89,8 +89,4 @@ contract AccruePositionInterestTest is TestHelper {
         assertEq(pair.buffer(), 0.5 ether);
         assertEq(pair.totalSupply(), 1 ether);
     }
-
-    // calling accrue interest twice
-
-    // withdraw and receive correct amount
 }
