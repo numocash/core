@@ -7,6 +7,7 @@ import { Lendgine } from "./Lendgine.sol";
 import { IPair } from "./interfaces/IPair.sol";
 
 import { SafeTransferLib } from "./libraries/SafeTransferLib.sol";
+import { FullMath } from "./libraries/FullMath.sol";
 
 contract Pair is IPair {
     /*//////////////////////////////////////////////////////////////
@@ -103,8 +104,8 @@ contract Pair is IPair {
         uint256 r1,
         uint256 shares
     ) public view returns (bool valid) {
-        uint256 scale0 = (r0 * 10**18) / shares;
-        uint256 scale1 = (r1 * 10**18) / shares;
+        uint256 scale0 = FullMath.mulDiv(r0, 10**18, shares);
+        uint256 scale1 = FullMath.mulDiv(r1, 10**18, shares);
 
         uint256 a = scale0 * 10**18;
         uint256 b = (upperBound * scale1);

@@ -12,6 +12,7 @@ import { ILendgine } from "./interfaces/ILendgine.sol";
 import { Position } from "./libraries/Position.sol";
 import { LiquidityMath } from "./libraries/LiquidityMath.sol";
 import { SafeTransferLib } from "./libraries/SafeTransferLib.sol";
+import { FullMath } from "./libraries/FullMath.sol";
 
 contract Lendgine is ERC20, JumpRate, ILendgine {
     using Position for mapping(address => Position.Info);
@@ -229,22 +230,23 @@ contract Lendgine is ERC20, JumpRate, ILendgine {
     /// @inheritdoc ILendgine
     function convertLiquidityToShare(uint256 liquidity) public view override returns (uint256) {
         uint256 _totalLiquidityBorrowed = totalLiquidityBorrowed;
-        return _totalLiquidityBorrowed == 0 ? liquidity : (liquidity * totalSupply) / _totalLiquidityBorrowed;
+        return
+            _totalLiquidityBorrowed == 0 ? liquidity : FullMath.mulDiv(liquidity, totalSupply, _totalLiquidityBorrowed);
     }
 
     /// @inheritdoc ILendgine
     function convertShareToLiquidity(uint256 shares) public view override returns (uint256) {
-        return (totalLiquidityBorrowed * shares) / totalSupply;
+        return FullMath.mulDiv(totalLiquidityBorrowed, shares, totalSupply);
     }
 
     /// @inheritdoc ILendgine
     function convertAssetToLiquidity(uint256 assets) public view override returns (uint256) {
-        return (assets * 10**18) / (2 * Pair(pair).upperBound());
+        return FullMath.mulDiv(assets, 10**18, 2 * Pair(pair).upperBound());
     }
 
     /// @inheritdoc ILendgine
     function convertLiquidityToAsset(uint256 liquidity) public view override returns (uint256) {
-        return (2 * liquidity * Pair(pair).upperBound()) / 10**18;
+        return FullMath.mulDiv(liquidity, 2 * Pair(pair).upperBound(), 10**18);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -284,13 +286,14 @@ contract Lendgine is ERC20, JumpRate, ILendgine {
         // assuming dpr
         uint256 borrowRate = getBorrowRate(_totalLiquidityBorrowed, _totalLiquidity);
 
-        uint256 dilutionLPRequested = (borrowRate * _totalLiquidityBorrowed * timeElapsed) / (1 ether * 1 days);
+        uint256 dilutionLPRequested = (FullMath.mulDiv(borrowRate, _totalLiquidityBorrowed, 1 ether) * timeElapsed) /
+            1 days;
         uint256 dilutionLP = dilutionLPRequested > _totalLiquidityBorrowed
             ? _totalLiquidityBorrowed
             : dilutionLPRequested;
 
         uint256 dilutionSpeculative = convertLiquidityToAsset(dilutionLP);
-        rewardPerLiquidityStored += (dilutionSpeculative * 1 ether) / _totalLiquidity;
+        rewardPerLiquidityStored += FullMath.mulDiv(dilutionSpeculative, 1 ether, _totalLiquidity);
 
         totalLiquidityBorrowed = _totalLiquidityBorrowed - dilutionLP;
         lastUpdate = uint64(block.timestamp);
@@ -320,6 +323,6 @@ contract Lendgine is ERC20, JumpRate, ILendgine {
     function newTokensOwed(Position.Info memory position, uint256 _rewardPerLiquidity) private pure returns (uint256) {
         uint256 liquidity = position.liquidity;
 
-        return (liquidity * (_rewardPerLiquidity - position.rewardPerLiquidityPaid)) / (1 ether);
+        return FullMath.mulDiv(liquidity, _rewardPerLiquidity - position.rewardPerLiquidityPaid, 1 ether);
     }
 }
