@@ -267,7 +267,7 @@ __metadata:
     husky: ^8.0.1
     lint-staged: ^13.0.3
     prettier: ^2.7.1
-    prettier-plugin-solidity: ^1.0.0-beta.24
+    prettier-plugin-solidity: ^1.0.0-dev.24
     solhint: ^3.3.7
     solhint-plugin-prettier: ^0.0.5
   languageName: unknown
@@ -2665,9 +2665,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"prettier-plugin-solidity@npm:^1.0.0-beta.24":
-  version: 1.0.0-dev.23
-  resolution: "prettier-plugin-solidity@npm:1.0.0-dev.23"
+"prettier-plugin-solidity@npm:^1.0.0-dev.24":
+  version: 1.0.0-dev.24
+  resolution: "prettier-plugin-solidity@npm:1.0.0-dev.24"
   dependencies:
     "@solidity-parser/parser": ^0.14.3
     emoji-regex: ^10.1.0
@@ -2677,7 +2677,7 @@ __metadata:
     string-width: ^4.2.3
   peerDependencies:
     prettier: ^2.3.0
-  checksum: bf068bcd763b2c2be48859abca5f2aee9543c38e875039470c8c0a850de4218292c7ec46fb63ef6866f51e8c87e80f8de015446ebd9f407712b26a9e30c41050
+  checksum: 526bc7bfee1dde875bc9ac68e35f85578390ac69cac8180c6e522ed9df10775d8f4ec33440a5d267f69d55389aace9ff4c684eb1de637aabab8c3657a65e2324
   languageName: node
   linkType: hard
 
