@@ -13,7 +13,7 @@ interface ILendgine {
     function pair() external view returns (address);
 
     /// @notice Returns information about a position by the position's key
-    function positions(bytes32 id)
+    function positions(address owner)
         external
         view
         returns (
@@ -22,24 +22,17 @@ interface ILendgine {
             uint256
         );
 
-    /// @notice The liquidity in the `currentTick`
-    function currentLiquidity() external view returns (uint256);
-
-    /// @notice The sum of tick * borrow liquidity for all borrowed liquidity
-    function interestNumerator() external view returns (uint256);
+    /// @notice The total amount of liquidity that has been lent out
+    function totalLiquidity() external view returns (uint256);
 
     /// @notice The currently borrowed liquidity by borrowers
     function totalLiquidityBorrowed() external view returns (uint256);
 
-    /// @notice The amount of speculative assert rewarded to each unit of `interestNumerator` scaled by one ether
-    function rewardPerINStored() external view returns (uint256);
+    /// @notice The amount of speculative assert rewarded to each unit of liquidity scaled by one ether
+    function rewardPerLiquidityStored() external view returns (uint256);
 
     /// @notice The timestamp at which interest was last accrued
     function lastUpdate() external view returns (uint64);
-
-    /// @notice The index of the highest tick that is being borrowed from
-    /// @dev A value of 0 corresponds to an uninitialized state
-    function currentTick() external view returns (uint16);
 
     /// @notice Creates a position with amountS `speculative` tokens as collateral and `pair` CFMM share
     /// as debt, exactly replicating the desired payoff
@@ -65,38 +58,27 @@ interface ILendgine {
     /// @notice Deposit CFMM shares from the `pair` to be lent out
     /// @dev The appropriate position should be minted in the pair contract before invoking this function
     /// @param to The address for which the deposit will be owned by
-    /// @param tick The interest rate tick at which the liquidity can be lent out
-    function deposit(address to, uint16 tick) external;
+    function deposit(address to) external;
 
     /// @notice Withdraw CFMM shares from the lending engine
     /// @dev The shares must still be withdrawn from the `pair`
-    /// @param tick The tick at which to remove shares
     /// @param liquidity The amount of liquidity to remove
-    function withdraw(uint16 tick, uint256 liquidity) external;
+    function withdraw(uint256 liquidity) external;
 
     /// @notice Calculates the interest rate and amount of interest that has gathered since the last update,
     /// then charges the borrowers and pays the lenders
     /// @dev Only positive interest rates are allowed
     function accrueInterest() external;
 
-    /// @notice Calculates the interest accrued by a specific tick
-    function accrueTickInterest(uint16 tick) external;
-
     /// @notice Calculates the interest accrued by a specific postion
     /// @dev msg.sender is used to calculate the owner of the position
-    /// @param tick The tick index of the position
-    function accruePositionInterest(uint16 tick) external;
+    function accruePositionInterest() external;
 
     /// @notice Collects tokens owed to a postion
     /// @dev msg.sender is used to calculative the owner of the position
     /// @param to The address to send the collected tokens to
-    /// @param tick The tick index of the position
     /// @param amountSRequested How much `speculative` tokens should be withdrawn from the tokens owed
-    function collect(
-        address to,
-        uint16 tick,
-        uint256 amountSRequested
-    ) external returns (uint256 amountS);
+    function collect(address to, uint256 amountSRequested) external returns (uint256 amountS);
 
     /// @notice Convert `pair` liquidity shares to amount of replicating derivative shares
     function convertLiquidityToShare(uint256 liquidity) external view returns (uint256);

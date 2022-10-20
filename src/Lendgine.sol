@@ -7,12 +7,13 @@ import { ERC20 } from "./ERC20.sol";
 import { JumpRate } from "./JumpRate.sol";
 
 import { IMintCallback } from "./interfaces/IMintCallback.sol";
+import { ILendgine } from "./interfaces/ILendgine.sol";
 
 import { Position } from "./libraries/Position.sol";
 import { LiquidityMath } from "./libraries/LiquidityMath.sol";
 import { SafeTransferLib } from "./libraries/SafeTransferLib.sol";
 
-contract Lendgine is ERC20, JumpRate {
+contract Lendgine is ERC20, JumpRate, ILendgine {
     using Position for mapping(address => Position.Info);
     using Position for Position.Info;
 
@@ -54,23 +55,30 @@ contract Lendgine is ERC20, JumpRate {
                                IMMUTABLES
     //////////////////////////////////////////////////////////////*/
 
-    address public immutable factory;
+    /// @inheritdoc ILendgine
+    address public immutable override factory;
 
-    address public immutable pair;
+    /// @inheritdoc ILendgine
+    address public immutable override pair;
 
     /*//////////////////////////////////////////////////////////////
                           LENDGINE STORAGE
     //////////////////////////////////////////////////////////////*/
 
-    mapping(address => Position.Info) public positions;
+    /// @inheritdoc ILendgine
+    mapping(address => Position.Info) public override positions;
 
-    uint256 public totalLiquidity;
+    /// @inheritdoc ILendgine
+    uint256 public override totalLiquidity;
 
-    uint256 public totalLiquidityBorrowed;
+    /// @inheritdoc ILendgine
+    uint256 public override totalLiquidityBorrowed;
 
-    uint256 public rewardPerLiquidityStored;
+    /// @inheritdoc ILendgine
+    uint256 public override rewardPerLiquidityStored;
 
-    uint64 public lastUpdate;
+    /// @inheritdoc ILendgine
+    uint64 public override lastUpdate;
 
     /*//////////////////////////////////////////////////////////////
                            REENTRANCY LOGIC
@@ -102,11 +110,12 @@ contract Lendgine is ERC20, JumpRate {
                             MINT/BURN LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    /// @inheritdoc ILendgine
     function mint(
         address to,
         uint256 amountS,
         bytes calldata data
-    ) external lock returns (uint256 shares) {
+    ) external override lock returns (uint256 shares) {
         _accrueInterest();
 
         uint256 liquidity = convertAssetToLiquidity(amountS);
@@ -129,7 +138,8 @@ contract Lendgine is ERC20, JumpRate {
         emit Mint(msg.sender, amountS, shares, liquidity, to);
     }
 
-    function burn(address to) external lock returns (uint256 amountS) {
+    /// @inheritdoc ILendgine
+    function burn(address to) external override lock returns (uint256 amountS) {
         _accrueInterest();
 
         uint256 shares = balanceOf[address(this)];
@@ -151,7 +161,8 @@ contract Lendgine is ERC20, JumpRate {
                         DEPOSIT/WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function deposit(address to) external lock {
+    /// @inheritdoc ILendgine
+    function deposit(address to) external override lock {
         _accrueInterest();
 
         uint256 liquidity = Pair(pair).buffer();
@@ -165,7 +176,8 @@ contract Lendgine is ERC20, JumpRate {
         emit Deposit(msg.sender, liquidity, to);
     }
 
-    function withdraw(uint256 liquidity) external lock {
+    /// @inheritdoc ILendgine
+    function withdraw(uint256 liquidity) external override lock {
         _accrueInterest();
 
         if (liquidity == 0) revert InsufficientOutputError();
@@ -185,16 +197,19 @@ contract Lendgine is ERC20, JumpRate {
                             INTEREST LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function accrueInterest() external lock {
+    /// @inheritdoc ILendgine
+    function accrueInterest() external override lock {
         _accrueInterest();
     }
 
-    function accruePositionInterest() external lock {
+    /// @inheritdoc ILendgine
+    function accruePositionInterest() external override lock {
         _accrueInterest();
         _accruePositionInterest(msg.sender);
     }
 
-    function collect(address to, uint256 amountSRequested) external lock returns (uint256 amountS) {
+    /// @inheritdoc ILendgine
+    function collect(address to, uint256 amountSRequested) external override lock returns (uint256 amountS) {
         Position.Info storage position = positions.get(msg.sender);
 
         amountS = amountSRequested > position.tokensOwed ? position.tokensOwed : amountSRequested;
@@ -211,20 +226,24 @@ contract Lendgine is ERC20, JumpRate {
                             ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function convertLiquidityToShare(uint256 liquidity) public view returns (uint256) {
+    /// @inheritdoc ILendgine
+    function convertLiquidityToShare(uint256 liquidity) public view override returns (uint256) {
         uint256 _totalLiquidityBorrowed = totalLiquidityBorrowed;
         return _totalLiquidityBorrowed == 0 ? liquidity : (liquidity * totalSupply) / _totalLiquidityBorrowed;
     }
 
-    function convertShareToLiquidity(uint256 shares) public view returns (uint256) {
+    /// @inheritdoc ILendgine
+    function convertShareToLiquidity(uint256 shares) public view override returns (uint256) {
         return (totalLiquidityBorrowed * shares) / totalSupply;
     }
 
-    function convertAssetToLiquidity(uint256 assets) public view returns (uint256) {
+    /// @inheritdoc ILendgine
+    function convertAssetToLiquidity(uint256 assets) public view override returns (uint256) {
         return (assets * 10**18) / (2 * Pair(pair).upperBound());
     }
 
-    function convertLiquidityToAsset(uint256 liquidity) public view returns (uint256) {
+    /// @inheritdoc ILendgine
+    function convertLiquidityToAsset(uint256 liquidity) public view override returns (uint256) {
         return (2 * liquidity * Pair(pair).upperBound()) / 10**18;
     }
 
@@ -232,7 +251,8 @@ contract Lendgine is ERC20, JumpRate {
                                  VIEW
     //////////////////////////////////////////////////////////////*/
 
-    function balanceSpeculative() public view returns (uint256) {
+    /// @inheritdoc ILendgine
+    function balanceSpeculative() public view override returns (uint256) {
         bool success;
         bytes memory data;
 
