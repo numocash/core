@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import { LiquidityMath } from "./LiquidityMath.sol";
+import { FullMath } from "./FullMath.sol";
 
 /// @notice Library for handling Lendgine liquidity positions
 /// @author Kyle Scott (https://github.com/Numoen/core/blob/master/src/libraries/Position.sol)
@@ -32,17 +33,40 @@ library Position {
                               POSITION LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Add or remove liquidity from a position
+    /// @notice Helper function for determining the amount of tokens owed to a position
+    /// @dev Assumes the global interest is up to date
     function update(
         mapping(address => Position.Info) storage self,
         address owner,
-        int256 liquidityDelta
+        int256 liquidityDelta,
+        uint256 rewardPerLiquidity
     ) internal {
-        Position.Info storage info = self[owner];
+        Position.Info storage positionInfo = self[owner];
+        Position.Info memory _positionInfo = positionInfo;
 
-        if (liquidityDelta == 0) revert NoLiquidityError();
+        uint256 tokensOwed;
+        if (_positionInfo.liquidity > 0) {
+            tokensOwed = newTokensOwed(_positionInfo, rewardPerLiquidity);
+        }
 
-        info.liquidity = LiquidityMath.addDelta(info.liquidity, liquidityDelta);
+        uint256 liquidityNext;
+        if (liquidityDelta == 0) {
+            if (_positionInfo.liquidity == 0) revert NoLiquidityError();
+            liquidityNext = _positionInfo.liquidity;
+        } else {
+            liquidityNext = LiquidityMath.addDelta(_positionInfo.liquidity, liquidityDelta);
+        }
+
+        if (liquidityDelta != 0) positionInfo.liquidity = liquidityNext;
+        positionInfo.rewardPerLiquidityPaid = rewardPerLiquidity;
+        if (tokensOwed > 0) positionInfo.tokensOwed = _positionInfo.tokensOwed + tokensOwed;
+    }
+
+    /// @notice Helper function for determining the amount of tokens owed to a position
+    function newTokensOwed(Position.Info memory position, uint256 rewardPerLiquidity) internal pure returns (uint256) {
+        uint256 liquidity = position.liquidity;
+
+        return FullMath.mulDiv(liquidity, rewardPerLiquidity - position.rewardPerLiquidityPaid, 1 ether);
     }
 
     /*//////////////////////////////////////////////////////////////

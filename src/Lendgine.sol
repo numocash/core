@@ -32,7 +32,7 @@ contract Lendgine is ERC20, JumpRate, ILendgine {
 
     event AccrueInterest(uint256 timeElapsed, uint256 amountS, uint256 liquidity, uint256 rewardPerLiquidity);
 
-    event AccruePositionInterest(address indexed owner, uint256 rewardPerLiquidity, uint256 tokensOwed);
+    event AccruePositionInterest(address indexed owner, uint256 rewardPerLiquidity);
 
     event Collect(address indexed owner, address indexed to, uint256 amountBase);
 
@@ -170,7 +170,7 @@ contract Lendgine is ERC20, JumpRate, ILendgine {
 
         if (liquidity == 0) revert InsufficientOutputError();
 
-        positions.update(to, int256(liquidity));
+        positions.update(to, int256(liquidity), rewardPerLiquidityStored);
         totalLiquidity += liquidity;
 
         Pair(pair).removeBuffer(liquidity);
@@ -187,7 +187,7 @@ contract Lendgine is ERC20, JumpRate, ILendgine {
         if (liquidity > positionInfo.liquidity) revert InsufficientPositionError();
         if (totalLiquidityBorrowed > totalLiquidity - liquidity) revert CompleteUtilizationError();
 
-        positions.update(msg.sender, -int256(liquidity));
+        positions.update(msg.sender, -int256(liquidity), rewardPerLiquidityStored);
         totalLiquidity -= liquidity;
 
         Pair(pair).addBuffer(liquidity);
@@ -305,24 +305,10 @@ contract Lendgine is ERC20, JumpRate, ILendgine {
     /// @dev Assume the global interest is up to date
     /// @param owner The address that this position belongs to
     function _accruePositionInterest(address owner) private {
-        Position.Info storage position = positions[owner];
-        Position.Info memory _position = position;
-
         uint256 _rewardPerLiquidityStored = rewardPerLiquidityStored; // SLOAD
 
-        uint256 tokensOwed = newTokensOwed(_position, _rewardPerLiquidityStored);
+        positions.update(owner, 0, _rewardPerLiquidityStored);
 
-        position.rewardPerLiquidityPaid = _rewardPerLiquidityStored;
-        position.tokensOwed = _position.tokensOwed + tokensOwed;
-
-        emit AccruePositionInterest(owner, _rewardPerLiquidityStored, tokensOwed);
-    }
-
-    /// @notice Helper function for determining the amount of tokens owed to a position
-    /// @dev Assumes the global interest is up to date
-    function newTokensOwed(Position.Info memory position, uint256 _rewardPerLiquidity) private pure returns (uint256) {
-        uint256 liquidity = position.liquidity;
-
-        return FullMath.mulDiv(liquidity, _rewardPerLiquidity - position.rewardPerLiquidityPaid, 1 ether);
+        emit AccruePositionInterest(owner, _rewardPerLiquidityStored);
     }
 }
