@@ -79,10 +79,10 @@ contract WithdrawTest is TestHelper {
     function testAccrueOnWithdraw() public {
         _mint(5 ether, cuh);
         pair.burn(cuh, 0.5 ether, 4 ether, 0.5 ether);
-        vm.warp(1 days + 1);
+        vm.warp(365 days + 1);
 
         _withdraw(0.1 ether, cuh);
-        uint256 dilutionLP = (0.5 ether * 145) / 1000;
+        uint256 dilutionLP = (0.5 ether * 6875) / 10000;
 
         // Test lendgine token
         assertEq(lendgine.totalSupply(), 0.5 ether);
@@ -107,7 +107,7 @@ contract WithdrawTest is TestHelper {
         assertEq(lendgine.totalLiquidityBorrowed(), 0.5 ether - dilutionLP);
         assertEq(lendgine.rewardPerLiquidityStored(), (dilutionLP * 10));
         assertEq(lendgine.getSupplyRate(0.5 ether, 1 ether), dilutionLP);
-        assertEq(lendgine.lastUpdate(), 1 days + 1);
+        assertEq(lendgine.lastUpdate(), 365 days + 1);
 
         // speculative is collateral plus rewards
         uint256 collateral = lendgine.convertLiquidityToAsset(lendgine.convertShareToLiquidity(0.5 ether));

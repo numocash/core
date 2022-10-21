@@ -67,12 +67,12 @@ contract AccruePositionInterestTest is TestHelper {
     function testAccrueInterstTime() public {
         _mint(5 ether, cuh);
 
-        vm.warp(1 days + 1);
+        vm.warp(365 days + 1);
 
         vm.prank(cuh);
         lendgine.accruePositionInterest();
 
-        uint256 dilutionLP = (0.5 ether * 145) / 1000;
+        uint256 dilutionLP = (0.5 ether * 6875) / 10000;
 
         // Test lendgine token
         assertEq(lendgine.totalSupply(), 0.5 ether);
@@ -92,7 +92,7 @@ contract AccruePositionInterestTest is TestHelper {
         assertEq(lendgine.totalLiquidity(), 1 ether);
         assertEq(lendgine.totalLiquidityBorrowed(), 0.5 ether - dilutionLP);
         assertEq(lendgine.rewardPerLiquidityStored(), (dilutionLP * 10));
-        assertEq(lendgine.lastUpdate(), 1 days + 1);
+        assertEq(lendgine.lastUpdate(), 365 days + 1);
 
         assertEq(pair.buffer(), 0.5 ether);
         assertEq(pair.totalSupply(), 1 ether);
@@ -101,12 +101,12 @@ contract AccruePositionInterestTest is TestHelper {
     function testAccrueStaggeredDeposits() public {
         _mint(5 ether, cuh);
         pair.burn(cuh, 0.5 ether, 4 ether, 0.5 ether);
-        vm.warp(1 days + 1);
+        vm.warp(365 days + 1);
 
         _deposit(1 ether, 8 ether, 1 ether, dennis);
-        uint256 dilutionLP = (0.5 ether * 145) / 1000;
+        uint256 dilutionLP = (0.5 ether * 6875) / 10000;
 
-        vm.warp(2 days + 1);
+        vm.warp(730 days + 1);
 
         vm.prank(cuh);
         lendgine.accruePositionInterest();
@@ -149,7 +149,7 @@ contract AccruePositionInterestTest is TestHelper {
         assertEq(lendgine.totalLiquidityBorrowed(), 0.5 ether - dilutionLP - dilutionLP2);
         assertEq(lendgine.rewardPerLiquidityStored(), dilutionLP * 10 + dilutionLP2 * 5);
         // assertEq(lendgine.getSupplyRate(0.5 ether, 1 ether), dilutionLP);
-        assertEq(lendgine.lastUpdate(), 2 days + 1);
+        assertEq(lendgine.lastUpdate(), 730 days + 1);
 
         // speculative is collateral plus rewards
         uint256 collateral = lendgine.convertLiquidityToAsset(lendgine.convertShareToLiquidity(0.5 ether));

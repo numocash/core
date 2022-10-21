@@ -4,10 +4,9 @@ pragma solidity ^0.8.0;
 import { IJumpRate } from "./interfaces/IJumpRate.sol";
 
 abstract contract JumpRate is IJumpRate {
-    uint256 public constant override baseRate = 0.02 ether;
     uint256 public constant override kink = 0.8 ether;
-    uint256 public constant override multiplier = 0.25 ether;
-    uint256 public constant override jumpMultiplier = 4 ether;
+    uint256 public constant override multiplier = 1.375 ether;
+    uint256 public constant override jumpMultiplier = 44.5 ether;
 
     function getBorrowRate(uint256 borrowedLiquidity, uint256 totalLiquidity)
         public
@@ -18,9 +17,9 @@ abstract contract JumpRate is IJumpRate {
         uint256 util = utilizationRate(borrowedLiquidity, totalLiquidity);
 
         if (util <= kink) {
-            return ((util * multiplier) / 1 ether) + baseRate;
+            return ((util * multiplier) / 1 ether);
         } else {
-            uint256 normalRate = ((kink * multiplier) / 1 ether) + baseRate;
+            uint256 normalRate = ((kink * multiplier) / 1 ether);
             uint256 excessUtil = util - kink;
             return ((excessUtil * jumpMultiplier) / 1 ether) + normalRate;
         }

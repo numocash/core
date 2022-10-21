@@ -6,8 +6,6 @@ pragma solidity >=0.5.0;
 /// @author Modified from Compound
 /// (https://github.com/compound-finance/compound-protocol/blob/master/contracts/JumpRateModel.sol)
 interface IJumpRate {
-    function baseRate() external view returns (uint256 baseRate);
-
     function kink() external view returns (uint256 kink);
 
     function multiplier() external view returns (uint256 multiplier);

@@ -20,12 +20,12 @@ contract CollectTest is TestHelper {
     function testCollect() public {
         _mint(5 ether, cuh);
 
-        vm.warp(1 days + 1);
+        vm.warp(365 days + 1);
 
         vm.prank(cuh);
         lendgine.accruePositionInterest();
 
-        uint256 dilutionLP = (0.5 ether * 145) / 1000;
+        uint256 dilutionLP = (0.5 ether * 6875) / 10000;
 
         vm.prank(cuh);
         lendgine.collect(cuh, (dilutionLP * 10));
@@ -48,7 +48,7 @@ contract CollectTest is TestHelper {
         assertEq(lendgine.totalLiquidity(), 1 ether);
         assertEq(lendgine.totalLiquidityBorrowed(), 0.5 ether - dilutionLP);
         assertEq(lendgine.rewardPerLiquidityStored(), (dilutionLP * 10));
-        assertEq(lendgine.lastUpdate(), 1 days + 1);
+        assertEq(lendgine.lastUpdate(), 365 days + 1);
 
         assertEq(pair.buffer(), 0.5 ether);
         assertEq(pair.totalSupply(), 1 ether);
@@ -57,12 +57,12 @@ contract CollectTest is TestHelper {
     function testPartialCollect() public {
         _mint(5 ether, cuh);
 
-        vm.warp(1 days + 1);
+        vm.warp(365 days + 1);
 
         vm.prank(cuh);
         lendgine.accruePositionInterest();
 
-        uint256 dilutionLP = (0.5 ether * 145) / 1000;
+        uint256 dilutionLP = (0.5 ether * 6875) / 10000;
 
         vm.prank(cuh);
         lendgine.collect(cuh, (dilutionLP * 5));
@@ -85,7 +85,7 @@ contract CollectTest is TestHelper {
         assertEq(lendgine.totalLiquidity(), 1 ether);
         assertEq(lendgine.totalLiquidityBorrowed(), 0.5 ether - dilutionLP);
         assertEq(lendgine.rewardPerLiquidityStored(), (dilutionLP * 10));
-        assertEq(lendgine.lastUpdate(), 1 days + 1);
+        assertEq(lendgine.lastUpdate(), 365 days + 1);
 
         assertEq(pair.buffer(), 0.5 ether);
         assertEq(pair.totalSupply(), 1 ether);
@@ -94,12 +94,12 @@ contract CollectTest is TestHelper {
     function testZeroCollect() public {
         _mint(5 ether, cuh);
 
-        vm.warp(1 days + 1);
+        vm.warp(365 days + 1);
 
         vm.prank(cuh);
         lendgine.accruePositionInterest();
 
-        uint256 dilutionLP = (0.5 ether * 145) / 1000;
+        uint256 dilutionLP = (0.5 ether * 6875) / 10000;
 
         vm.prank(cuh);
         lendgine.collect(cuh, 0);
@@ -122,7 +122,7 @@ contract CollectTest is TestHelper {
         assertEq(lendgine.totalLiquidity(), 1 ether);
         assertEq(lendgine.totalLiquidityBorrowed(), 0.5 ether - dilutionLP);
         assertEq(lendgine.rewardPerLiquidityStored(), (dilutionLP * 10));
-        assertEq(lendgine.lastUpdate(), 1 days + 1);
+        assertEq(lendgine.lastUpdate(), 365 days + 1);
 
         assertEq(pair.buffer(), 0.5 ether);
         assertEq(pair.totalSupply(), 1 ether);
@@ -131,15 +131,15 @@ contract CollectTest is TestHelper {
     function testOverCollect() public {
         _mint(5 ether, cuh);
 
-        vm.warp(1 days + 1);
+        vm.warp(365 days + 1);
 
         vm.prank(cuh);
         lendgine.accruePositionInterest();
 
-        uint256 dilutionLP = (0.5 ether * 145) / 1000;
+        uint256 dilutionLP = (0.5 ether * 6875) / 10000;
 
         vm.prank(cuh);
-        lendgine.collect(cuh, 1 ether);
+        lendgine.collect(cuh, 5 ether);
 
         // Test lendgine token
         assertEq(lendgine.totalSupply(), 0.5 ether);
@@ -159,7 +159,7 @@ contract CollectTest is TestHelper {
         assertEq(lendgine.totalLiquidity(), 1 ether);
         assertEq(lendgine.totalLiquidityBorrowed(), 0.5 ether - dilutionLP);
         assertEq(lendgine.rewardPerLiquidityStored(), (dilutionLP * 10));
-        assertEq(lendgine.lastUpdate(), 1 days + 1);
+        assertEq(lendgine.lastUpdate(), 365 days + 1);
 
         assertEq(pair.buffer(), 0.5 ether);
         assertEq(pair.totalSupply(), 1 ether);

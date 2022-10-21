@@ -283,11 +283,10 @@ contract Lendgine is ERC20, JumpRate, ILendgine {
         uint256 timeElapsed = block.timestamp - lastUpdate;
         if (timeElapsed == 0) return;
 
-        // assuming dpr
         uint256 borrowRate = getBorrowRate(_totalLiquidityBorrowed, _totalLiquidity);
 
         uint256 dilutionLPRequested = (FullMath.mulDiv(borrowRate, _totalLiquidityBorrowed, 1 ether) * timeElapsed) /
-            1 days;
+            365 days;
         uint256 dilutionLP = dilutionLPRequested > _totalLiquidityBorrowed
             ? _totalLiquidityBorrowed
             : dilutionLPRequested;
