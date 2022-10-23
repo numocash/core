@@ -10,6 +10,7 @@ import { Lendgine } from "../src/Lendgine.sol";
 import { Pair } from "../src/Pair.sol";
 
 import { FullMath } from "../src/libraries/FullMath.sol";
+import { PRBMathUD60x18 } from "prb-math/PRBMathUD60x18.sol";
 
 contract InvariantTest is TestHelper {
     uint256 public constant maxTokens = type(uint256).max;
