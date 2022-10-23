@@ -7,9 +7,7 @@ import { Lendgine } from "./Lendgine.sol";
 import { IPair } from "./interfaces/IPair.sol";
 
 import { SafeTransferLib } from "./libraries/SafeTransferLib.sol";
-import { FullMath } from "./libraries/FullMath.sol";
 import { PRBMathUD60x18 } from "prb-math/PRBMathUD60x18.sol";
-
 import "forge-std/console2.sol";
 
 contract Pair is IPair {
@@ -115,10 +113,10 @@ contract Pair is IPair {
         uint256 c = PRBMathUD60x18.powu(scale1, 2) / 4;
         uint256 d = PRBMathUD60x18.powu(upperBound, 2);
 
-        // console2.log("a", a);
-        // console2.log("b", b);
-        // console2.log("c", c);
-        // console2.log("d", d);
+        console2.log("a", a);
+        console2.log("b", b);
+        console2.log("c", c);
+        console2.log("d", d);
 
         if (scale1 > 2 * upperBound) revert SpeculativeInvariantError();
 

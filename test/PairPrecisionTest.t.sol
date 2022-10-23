@@ -9,7 +9,7 @@ import { Factory } from "../src/Factory.sol";
 import { Lendgine } from "../src/Lendgine.sol";
 import { Pair } from "../src/Pair.sol";
 
-import { FullMath } from "../src/libraries/FullMath.sol";
+import { PRBMath } from "prb-math/PRBMath.sol";
 import { PRBMathUD60x18 } from "prb-math/PRBMathUD60x18.sol";
 
 contract InvariantTest is TestHelper {
@@ -34,46 +34,36 @@ contract InvariantTest is TestHelper {
     // price precision: $1
     // bound precision: $1
 
-    function testBaseline() public {
-        uint256 price = 10**18;
-        uint256 r0 = 10**18;
-        uint256 r1 = 8 ether;
-        _pairMint(1 ether, 8 ether, 1 ether, cuh);
-
-        uint256 value = r0 + (price * r1) / 1 ether;
-
-        uint256 scale = 1 ether; // r0 / $, 1 ether of r0 per dollar
-
-        console2.log("price of 1 ether LP in $:", value / scale);
-        console2.log("max TVL of pool in $", FullMath.mulDiv(value, maxTokens, scale * 1 ether));
+    /// @dev uses r0 first then r1 if r0 is zero
+    function reservesToPrice(
+        uint256 r0,
+        uint256 r1,
+        uint256 liquidity,
+        uint256 _upperBound
+    ) public returns (uint256 price) {
+        if (r0 == 0) {
+            uint256 scale0 = PRBMathUD60x18.div(r0, liquidity);
+            return PRBMathUD60x18.sqrt(scale0);
+        } else {
+            uint256 scale1 = PRBMathUD60x18.div(r1, liquidity);
+            return _upperBound - scale1 / 2;
+        }
     }
 
-    function testLPPriceLow() public {
-        uint256 price = upperBound / 10**6;
-        uint256 r0 = price**2 / 1 ether;
-        uint256 r1 = 2 * (upperBound - price);
-        _pairMint(r0, r1, 1 ether, cuh);
+    function priceToReserves(
+        uint256 price,
+        uint256 liquidity,
+        uint256 _upperBound
+    ) public pure returns (uint256 r0, uint256 r1) {
+        uint256 scale0 = PRBMathUD60x18.powu(price, 2);
+        uint256 scale1 = 2 * (_upperBound - price);
 
-        uint256 value = r0 + (price * r1) / 1 ether;
-
-        uint256 scale = 1 ether; // r0 / $, 1 ether of r0 per dollar
-
-        console2.log("price of 1 ether LP in $:", value / scale);
-        console2.log("max TVL of pool in $", FullMath.mulDiv(value, maxTokens, scale * 1 ether));
+        return (PRBMathUD60x18.mul(scale0, liquidity), PRBMathUD60x18.mul(scale1, liquidity));
     }
 
-    function testLpPriceMax() public {
-        uint256 price = upperBound;
-        uint256 r0 = price**2 / 1 ether;
-        uint256 r1 = 2 * (upperBound - price);
-        _pairMint(r0, r1, 1 ether, cuh);
-
-        uint256 value = r0;
-
-        uint256 scale = 1 ether; // r0 / $, 1 ether of r0 per dollar
-
-        console2.log("price of 1 ether LP in $:", value / scale);
-        console2.log("max TVL of pool in $", FullMath.mulDiv(value, maxTokens, scale * 1 ether));
+    function priceToLPValue(uint256 price, uint256 _upperBound) public returns (uint256 value) {
+        (uint256 r0, uint256 r1) = priceToReserves(price, 1 ether, _upperBound);
+        return r0 + PRBMathUD60x18.mul(r1, price);
     }
 
     function testPricePrecision() public {
@@ -87,113 +77,165 @@ contract InvariantTest is TestHelper {
         _pairMint(1, 8, 1, cuh);
     }
 
-    // speculative is worth 10**6
-    // base is worth 10**-6
-    function testHighUpperBoundMax() public {
-        uint256 _upperBound = 10**(12 + 18);
+    function testBaseline() public {
+        uint256 liquidity = 1 ether;
+        uint256 price = 1 ether;
+        uint256 conversion = 1 ether; // base to $ scaled
 
+        (uint256 r0, uint256 r1) = priceToReserves(price, liquidity, upperBound);
+        uint256 value = priceToLPValue(price, upperBound);
+        _pairMint(r0, r1, liquidity, cuh);
+
+        console2.log("price of 1 ether LP in $:", value / conversion);
+        console2.log("max TVL of pool in $", PRBMath.mulDiv(value, maxTokens, conversion * 1 ether));
+        // 1 ether is because value is for 1 ether of LP tokens
+    }
+
+    function testLPPriceLow() public {
+        uint256 liquidity = 1 ether;
+        uint256 price = 10**12;
+        uint256 conversion = 1 ether; // base to $ scaled
+
+        (uint256 r0, uint256 r1) = priceToReserves(price, liquidity, upperBound);
+        uint256 value = priceToLPValue(price, upperBound);
+        _pairMint(r0, r1, liquidity, cuh);
+
+        console2.log("price of 1 ether LP in $:", value / conversion);
+        console2.log("max TVL of pool in $", PRBMath.mulDiv(value, maxTokens, conversion * 1 ether));
+        // 1 ether is because value is for 1 ether of LP tokens
+    }
+
+    function testLPPriceMax() public {
+        uint256 liquidity = 1 ether;
+        uint256 price = upperBound;
+        uint256 conversion = 1 ether; // base to $ scaled
+
+        (uint256 r0, uint256 r1) = priceToReserves(price, liquidity, upperBound);
+        uint256 value = priceToLPValue(price, upperBound);
+        _pairMint(r0, r1, liquidity, cuh);
+
+        console2.log("price of 1 ether LP in $:", value / conversion);
+        console2.log("max TVL of pool in $", PRBMath.mulDiv(value, maxTokens, conversion * 1 ether));
+        // 1 ether is because value is for 1 ether of LP tokens
+    }
+
+    function testHighConversionBaseline() public {
+        // 10**6 base tokens = $1
+        // 10**-3 speculative tokens = $1
+        uint256 _upperBound = 10**(9 + 18);
         Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), _upperBound));
-
         Pair _pair = Pair(_lendgine.pair());
 
+        uint256 liquidity = 1 ether;
+        uint256 price = _upperBound / 10;
+        uint256 conversion = 10**(6 + 18);
+
+        (uint256 r0, uint256 r1) = priceToReserves(price, liquidity, _upperBound);
+
+        uint256 value = priceToLPValue(price, _upperBound);
+        _pairMint(r0, r1, liquidity, cuh, _pair);
+
+        console2.log("price of 1 ether LP in $:", value / conversion);
+        console2.log("max TVL of pool in $", PRBMath.mulDiv(value, maxTokens, conversion * 1 ether));
+    }
+
+    function testHighConversionPriceMax() public {
+        // 10**6 base tokens = $1
+        // 10**-3 speculative tokens = $1
+        uint256 _upperBound = 10**(9 + 18);
+        Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), _upperBound));
+        Pair _pair = Pair(_lendgine.pair());
+
+        uint256 liquidity = 1 ether;
         uint256 price = _upperBound;
-        uint256 r0 = price**2 / 1 ether;
+        uint256 conversion = 10**(6 + 18);
 
-        base.mint(cuh, r0);
+        (uint256 r0, uint256 r1) = priceToReserves(price, liquidity, _upperBound);
 
-        vm.prank(cuh);
-        base.transfer(address(_pair), r0);
-        _pair.mint(1 ether);
+        uint256 value = priceToLPValue(price, _upperBound);
+        _pairMint(r0, r1, liquidity, cuh, _pair);
 
-        uint256 value = r0;
-
-        uint256 scale = 10**24; // r0 / $, 1 ether of r0 per dollar
-
-        console2.log("price of 1 ether LP in $", value / scale);
-        console2.log("max TVL of pool in $", (maxTokens / scale) * (value / 1 ether));
+        console2.log("price of 1 ether LP in $:", value / conversion);
+        console2.log("max TVL of pool in $", PRBMath.mulDiv(value, maxTokens, conversion * 1 ether));
     }
 
-    function testHighUpperBoundLow() public {
-        uint256 _upperBound = 10**(12 + 18);
-
+    function testHighConversionPriceLow() public {
+        // 10**6 base tokens = $1
+        // 10**-3 speculative tokens = $1
+        uint256 _upperBound = 10**(9 + 18);
         Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), _upperBound));
-
         Pair _pair = Pair(_lendgine.pair());
 
-        uint256 price = 10**24;
-        uint256 r0 = price**2 / 1 ether;
-        uint256 r1 = 2 * (_upperBound - price);
+        uint256 liquidity = 1 ether;
+        uint256 price = _upperBound / 10**6;
+        uint256 conversion = 10**(6 + 18);
 
-        base.mint(cuh, r0);
-        speculative.mint(cuh, r1);
+        (uint256 r0, uint256 r1) = priceToReserves(price, liquidity, _upperBound);
 
-        vm.prank(cuh);
-        base.transfer(address(_pair), r0);
-        vm.prank(cuh);
-        speculative.transfer(address(_pair), r1);
+        uint256 value = priceToLPValue(price, _upperBound);
+        _pairMint(r0, r1, liquidity, cuh, _pair);
 
-        _pair.mint(1 ether);
-
-        uint256 value = r0 + (price * r1) / 1 ether;
-        uint256 scale = 10**24; // r0 / $, 1 ether of r0 per dollar
-
-        console2.log("price of 1 ether LP in $", value / scale);
-        console2.log("max TVL of pool in $", FullMath.mulDiv(value, maxTokens, scale * 1 ether));
+        console2.log("price of 1 ether LP in $:", value / conversion);
+        console2.log("max TVL of pool in $", PRBMath.mulDiv(value, maxTokens, conversion * 1 ether));
     }
 
-    // // price can't be lower than 10**9
-    // // upper bound can't be lower than 10**9
-    function testLowUpperBoundMax() public {
-        uint256 _upperBound = 10**9;
-
+    function testLowConversionBaseline() public {
+        // 10**-6 base tokens = $1
+        // 10**-3 speculative tokens = $1
+        uint256 _upperBound = 10**(18 - 9);
         Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), _upperBound));
-
         Pair _pair = Pair(_lendgine.pair());
 
+        uint256 liquidity = 1 ether;
+        uint256 price = _upperBound / 10;
+        uint256 conversion = 10**(18 - 6);
+
+        (uint256 r0, uint256 r1) = priceToReserves(price, liquidity, _upperBound);
+
+        uint256 value = priceToLPValue(price, _upperBound);
+        _pairMint(r0, r1, liquidity, cuh, _pair);
+
+        console2.log("price of 1 ether LP in $:", value / conversion);
+        console2.log("max TVL of pool in $", PRBMath.mulDiv(value, maxTokens, conversion * 1 ether));
+    }
+
+    function testLowConversionPriceMax() public {
+        // 10**-6 base tokens = $1
+        // 10**-3 speculative tokens = $1
+        uint256 _upperBound = 10**(18 - 9);
+        Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), _upperBound));
+        Pair _pair = Pair(_lendgine.pair());
+
+        uint256 liquidity = 1 ether;
         uint256 price = _upperBound;
-        uint256 r0 = price**2 / 1 ether;
+        uint256 conversion = 10**(18 - 6);
 
-        base.mint(cuh, r0);
+        (uint256 r0, uint256 r1) = priceToReserves(price, liquidity, _upperBound);
 
-        vm.prank(cuh);
-        base.transfer(address(_pair), r0);
+        uint256 value = priceToLPValue(price, _upperBound);
+        _pairMint(r0, r1, liquidity, cuh, _pair);
 
-        _pair.mint(1 ether);
-
-        uint256 value = r0;
-
-        uint256 scale = 10**12; // r0 / $, 1 ether of r0 per dollar
-
-        console2.log("price of 1 ether LP in $", value / scale);
-        console2.log("max TVL of pool in $", FullMath.mulDiv(value, maxTokens, scale * 1 ether));
+        console2.log("price of 1 ether LP in $:", value / conversion);
+        console2.log("max TVL of pool in $", PRBMath.mulDiv(value, maxTokens, conversion * 1 ether));
     }
 
-    function testLowUpperBoundLow() public {
-        uint256 _upperBound = 10**9;
-
+    function testLowConversionPriceLow() public {
+        // 10**-6 base tokens = $1
+        // 10**-3 speculative tokens = $1
+        uint256 _upperBound = 10**(18 - 9);
         Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), _upperBound));
-
         Pair _pair = Pair(_lendgine.pair());
 
-        uint256 price = 0;
-        uint256 r0 = price**2 / 1 ether;
-        uint256 r1 = 2 * (_upperBound - price);
+        uint256 liquidity = 1 ether;
+        uint256 price = _upperBound / 10**6;
+        uint256 conversion = 10**(18 - 6);
 
-        base.mint(cuh, r0);
-        speculative.mint(cuh, r1);
+        (uint256 r0, uint256 r1) = priceToReserves(price, liquidity, _upperBound);
 
-        vm.prank(cuh);
-        base.transfer(address(_pair), r0);
-        vm.prank(cuh);
-        speculative.transfer(address(_pair), r1);
+        uint256 value = priceToLPValue(price, _upperBound);
+        _pairMint(r0, r1, liquidity, cuh, _pair);
 
-        _pair.mint(1 ether);
-
-        uint256 value = r0;
-
-        uint256 scale = 10**12; // r0 / $, 1 ether of r0 per dollar
-
-        console2.log("price of 1 ether LP in $", value / scale);
-        console2.log("max TVL of pool in $", FullMath.mulDiv(value, maxTokens, scale * 1 ether));
+        console2.log("price of 1 ether LP in $:", value / conversion);
+        console2.log("max TVL of pool in $", PRBMath.mulDiv(value, maxTokens, conversion * 1 ether));
     }
 }

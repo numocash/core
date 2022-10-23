@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import { LiquidityMath } from "./LiquidityMath.sol";
-import { FullMath } from "./FullMath.sol";
+import { PRBMathUD60x18 } from "prb-math/PRBMathUD60x18.sol";
 
 /// @notice Library for handling Lendgine liquidity positions
 /// @author Kyle Scott (https://github.com/Numoen/core/blob/master/src/libraries/Position.sol)
@@ -66,7 +66,7 @@ library Position {
     function newTokensOwed(Position.Info memory position, uint256 rewardPerLiquidity) internal pure returns (uint256) {
         uint256 liquidity = position.liquidity;
 
-        return FullMath.mulDiv(liquidity, rewardPerLiquidity - position.rewardPerLiquidityPaid, 1 ether);
+        return PRBMathUD60x18.mul(liquidity, rewardPerLiquidity - position.rewardPerLiquidityPaid);
     }
 
     /*//////////////////////////////////////////////////////////////
