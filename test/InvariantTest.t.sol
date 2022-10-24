@@ -8,7 +8,9 @@ import { CallbackHelper } from "./utils/CallbackHelper.sol";
 import { Factory } from "../src/Factory.sol";
 import { Lendgine } from "../src/Lendgine.sol";
 import { Pair } from "../src/Pair.sol";
-import { Math } from "./utils/Math.sol";
+
+import { PRBMath } from "prb-math/PRBMath.sol";
+import { PRBMathUD60x18 } from "prb-math/PRBMathUD60x18.sol";
 
 contract InvariantTest is TestHelper {
     function setUp() public {
@@ -122,7 +124,6 @@ contract InvariantTest is TestHelper {
         _pairMint(9 ether, 4 ether, 1 ether, cuh);
 
         pair.burn(cuh, 9 ether, 4 ether, 1 ether);
-
         assertEq(base.balanceOf(cuh), 9 ether);
         assertEq(speculative.balanceOf(cuh), 4 ether);
 
@@ -166,15 +167,16 @@ contract InvariantTest is TestHelper {
 
         uint256 amountSOut = 0.00001 ether;
 
-        uint256 a = (amountSOut * upperBound) / 10**18;
+        uint256 a = PRBMathUD60x18.mul(amountSOut, upperBound);
 
-        uint256 b = (amountSOut**2) / 4 ether;
+        uint256 b = PRBMathUD60x18.powu(amountSOut, 2) / 4;
 
-        uint256 c = (amountSOut * rS) / 2 ether;
+        uint256 c = PRBMathUD60x18.mul(amountSOut, rS) / 2;
 
         uint256 amountBIn = a + b - c;
 
         base.mint(cuh, amountBIn);
+        console2.log(amountBIn);
 
         vm.prank(cuh);
         base.transfer(address(pair), amountBIn);
@@ -185,39 +187,34 @@ contract InvariantTest is TestHelper {
         pair.swap(cuh, 0, amountSOut);
     }
 
-    // function testSwapBForS2() public {
-    //     uint256 rB = 0 ether;
-    //     uint256 rS = 4 ether;
-    //     _pairMint(rB, rS, cuh);
+    function testSwapBForS2() public {
+        uint256 rB = 1 ether;
+        uint256 rS = 8 ether;
+        _pairMint(rB, rS, 1 ether, cuh);
 
-    //     uint256 amountBIn = 0.00001 ether;
+        uint256 amountBOut = 10000025000000 - 50000000;
 
-    //     uint256 a = rS + 2 * upperBound;
+        uint256 a = 2 * upperBound - rS;
 
-    //     uint256 b = 4 * amountBIn * 1 ether;
+        uint256 b = 4 * amountBOut;
 
-    //     uint256 c = Math.sqrt(b + a**2);
+        uint256 c = PRBMathUD60x18.sqrt(PRBMathUD60x18.powu(a, 2) - b);
 
-    //     uint256 amountSOut = a + c;
+        uint256 amountSIn = a - c;
 
-    //     base.mint(cuh, amountBIn);
+        console2.log("base out", amountBOut);
+        console2.log("spec in", amountSIn);
 
-    //     console2.log("base in", amountBIn);
-    //     console2.log("spec out", amountSOut);
+        console2.log("quote price", 1 ether);
+        console2.log("trade price", (amountBOut * 1 ether) / amountSIn);
 
-    //     console2.log("IB", pair.calcInvariant(rB, rS));
-    //     // console2.log("IA", pair.calcInvariant(rB + , r1);)
+        speculative.mint(cuh, amountSIn);
 
-    //     vm.prank(cuh);
-    //     base.approve(address(this), amountBIn);
+        vm.prank(cuh);
+        speculative.transfer(address(pair), amountSIn);
 
-    //     pair.swap(
-    //         cuh,
-    //         0,
-    //         amountSOut,
-    //         abi.encode(SwapCallbackData({ key: key, payer: cuh, amount0In: amountBIn, amount1In: 0 }))
-    //     );
-    // }
+        pair.swap(cuh, amountBOut, 0);
+    }
 
     function testSwapUpperBound() public {
         uint256 rB = 0 ether;

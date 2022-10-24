@@ -7,7 +7,7 @@ import { Lendgine } from "./Lendgine.sol";
 import { IPair } from "./interfaces/IPair.sol";
 
 import { SafeTransferLib } from "./libraries/SafeTransferLib.sol";
-import { FullMath } from "./libraries/FullMath.sol";
+import { PRBMathUD60x18 } from "prb-math/PRBMathUD60x18.sol";
 
 contract Pair is IPair {
     /*//////////////////////////////////////////////////////////////
@@ -104,13 +104,13 @@ contract Pair is IPair {
         uint256 r1,
         uint256 shares
     ) public view returns (bool valid) {
-        uint256 scale0 = FullMath.mulDiv(r0, 10**18, shares);
-        uint256 scale1 = FullMath.mulDiv(r1, 10**18, shares);
+        uint256 scale0 = PRBMathUD60x18.div(r0, shares);
+        uint256 scale1 = PRBMathUD60x18.div(r1, shares);
 
-        uint256 a = scale0 * 10**18;
-        uint256 b = (upperBound * scale1);
-        uint256 c = (scale1**2) / (4);
-        uint256 d = upperBound**2;
+        uint256 a = scale0;
+        uint256 b = PRBMathUD60x18.mul(scale1, upperBound);
+        uint256 c = PRBMathUD60x18.powu(scale1, 2) / 4;
+        uint256 d = PRBMathUD60x18.powu(upperBound, 2);
 
         if (scale1 > 2 * upperBound) revert SpeculativeInvariantError();
 

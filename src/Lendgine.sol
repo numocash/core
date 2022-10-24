@@ -12,7 +12,8 @@ import { ILendgine } from "./interfaces/ILendgine.sol";
 import { Position } from "./libraries/Position.sol";
 import { LiquidityMath } from "./libraries/LiquidityMath.sol";
 import { SafeTransferLib } from "./libraries/SafeTransferLib.sol";
-import { FullMath } from "./libraries/FullMath.sol";
+import { PRBMathUD60x18 } from "prb-math/PRBMathUD60x18.sol";
+import { PRBMath } from "prb-math/PRBMath.sol";
 
 contract Lendgine is ERC20, JumpRate, ILendgine {
     using Position for mapping(address => Position.Info);
@@ -231,22 +232,22 @@ contract Lendgine is ERC20, JumpRate, ILendgine {
     function convertLiquidityToShare(uint256 liquidity) public view override returns (uint256) {
         uint256 _totalLiquidityBorrowed = totalLiquidityBorrowed;
         return
-            _totalLiquidityBorrowed == 0 ? liquidity : FullMath.mulDiv(liquidity, totalSupply, _totalLiquidityBorrowed);
+            _totalLiquidityBorrowed == 0 ? liquidity : PRBMath.mulDiv(liquidity, totalSupply, _totalLiquidityBorrowed);
     }
 
     /// @inheritdoc ILendgine
     function convertShareToLiquidity(uint256 shares) public view override returns (uint256) {
-        return FullMath.mulDiv(totalLiquidityBorrowed, shares, totalSupply);
+        return PRBMath.mulDiv(totalLiquidityBorrowed, shares, totalSupply);
     }
 
     /// @inheritdoc ILendgine
     function convertAssetToLiquidity(uint256 assets) public view override returns (uint256) {
-        return FullMath.mulDiv(assets, 10**18, 2 * Pair(pair).upperBound());
+        return PRBMathUD60x18.div(assets, 2 * Pair(pair).upperBound());
     }
 
     /// @inheritdoc ILendgine
     function convertLiquidityToAsset(uint256 liquidity) public view override returns (uint256) {
-        return FullMath.mulDiv(liquidity, 2 * Pair(pair).upperBound(), 10**18);
+        return PRBMathUD60x18.mul(liquidity, 2 * Pair(pair).upperBound());
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -285,14 +286,14 @@ contract Lendgine is ERC20, JumpRate, ILendgine {
 
         uint256 borrowRate = getBorrowRate(_totalLiquidityBorrowed, _totalLiquidity);
 
-        uint256 dilutionLPRequested = (FullMath.mulDiv(borrowRate, _totalLiquidityBorrowed, 1 ether) * timeElapsed) /
+        uint256 dilutionLPRequested = (PRBMathUD60x18.mul(borrowRate, _totalLiquidityBorrowed) * timeElapsed) /
             365 days;
         uint256 dilutionLP = dilutionLPRequested > _totalLiquidityBorrowed
             ? _totalLiquidityBorrowed
             : dilutionLPRequested;
 
         uint256 dilutionSpeculative = convertLiquidityToAsset(dilutionLP);
-        rewardPerLiquidityStored += FullMath.mulDiv(dilutionSpeculative, 1 ether, _totalLiquidity);
+        rewardPerLiquidityStored += PRBMathUD60x18.div(dilutionSpeculative, _totalLiquidity);
 
         totalLiquidityBorrowed = _totalLiquidityBorrowed - dilutionLP;
         lastUpdate = uint64(block.timestamp);

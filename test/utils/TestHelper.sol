@@ -84,6 +84,27 @@ abstract contract TestHelper is Test, CallbackHelper {
         pair.mint(liquidity);
     }
 
+    function _pairMint(
+        uint256 amountBase,
+        uint256 amountSpeculative,
+        uint256 liquidity,
+        address spender,
+        Pair _pair
+    ) internal {
+        base.mint(spender, amountBase);
+        speculative.mint(spender, amountSpeculative);
+
+        if (spender != address(this)) {
+            vm.prank(spender);
+            speculative.transfer(address(_pair), amountSpeculative);
+
+            vm.prank(spender);
+            base.transfer(address(_pair), amountBase);
+        }
+
+        _pair.mint(liquidity);
+    }
+
     function _withdraw(uint256 amountLP, address spender) internal {
         vm.prank(spender);
         lendgine.withdraw(amountLP);
