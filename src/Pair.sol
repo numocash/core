@@ -9,6 +9,8 @@ import { IPair } from "./interfaces/IPair.sol";
 import { SafeTransferLib } from "./libraries/SafeTransferLib.sol";
 import { PRBMathUD60x18 } from "prb-math/PRBMathUD60x18.sol";
 
+import "forge-std/console2.sol";
+
 contract Pair is IPair {
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
