@@ -58,6 +58,12 @@ contract Pair is IPair {
     /// @inheritdoc IPair
     uint256 public immutable override upperBound;
 
+    /// @inheritdoc IPair
+    uint256 public immutable override baseScaleFactor;
+
+    /// @inheritdoc IPair
+    uint256 public immutable override speculativeScaleFactor;
+
     /*//////////////////////////////////////////////////////////////
                                  STORAGE
     //////////////////////////////////////////////////////////////*/
@@ -91,7 +97,17 @@ contract Pair is IPair {
     constructor(address _factory) {
         lendgine = msg.sender;
         factory = _factory;
-        (base, speculative, upperBound) = Factory(factory).parameters();
+
+        uint256 _baseScaleFactor;
+        uint256 _speculativeScaleFactor;
+
+        (base, speculative, _baseScaleFactor, _speculativeScaleFactor, upperBound) = Factory(factory).parameters();
+
+        if (_baseScaleFactor > 18 || _baseScaleFactor < 6) revert InvariantError();
+        if (_speculativeScaleFactor > 18 || _speculativeScaleFactor < 6) revert InvariantError();
+
+        baseScaleFactor = _baseScaleFactor;
+        speculativeScaleFactor = _speculativeScaleFactor;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -104,8 +120,8 @@ contract Pair is IPair {
         uint256 r1,
         uint256 shares
     ) public view returns (bool valid) {
-        uint256 scale0 = PRBMathUD60x18.div(r0, shares);
-        uint256 scale1 = PRBMathUD60x18.div(r1, shares);
+        uint256 scale0 = PRBMathUD60x18.div(PRBMathUD60x18.div(r0, shares), 10**baseScaleFactor);
+        uint256 scale1 = PRBMathUD60x18.div(PRBMathUD60x18.div(r1, shares), 10**speculativeScaleFactor);
 
         uint256 a = scale0;
         uint256 b = PRBMathUD60x18.mul(scale1, upperBound);

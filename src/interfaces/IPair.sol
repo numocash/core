@@ -18,6 +18,12 @@ interface IPair {
     /// @notice The speculative token of the pair
     function speculative() external view returns (address);
 
+    /// @notice The scale of the base token
+    function baseScaleFactor() external view returns (uint256);
+
+    /// @notice The scale of the speculative token
+    function speculativeScaleFactor() external view returns (uint256);
+
     /// @notice The upper price limit of the CFMM, the exchange rate offered by this pool will never exceed this value
     /// @dev Scaled by 10**18
     function upperBound() external view returns (uint256);

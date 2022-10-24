@@ -11,6 +11,8 @@ interface IFactory {
     function getLendgine(
         address base,
         address speculative,
+        uint256 baseScaleFactor,
+        uint256 speculativeScaleFactor,
         uint256 upperBound
     ) external view returns (address lendgine);
 
@@ -23,6 +25,8 @@ interface IFactory {
         returns (
             address base,
             address speculative,
+            uint256 baseScaleFactor,
+            uint256 speculativeScaleFactor,
             uint256 upperBound
         );
 
@@ -31,6 +35,8 @@ interface IFactory {
     function createLendgine(
         address base,
         address speculative,
+        uint256 baseScaleFactor,
+        uint256 speculativeScaleFactor,
         uint256 upperBound
     ) external returns (address lendgine);
 }
