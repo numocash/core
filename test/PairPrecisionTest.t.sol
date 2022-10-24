@@ -181,7 +181,7 @@ contract InvariantTest is TestHelper {
 
     function testLowConversionBaseline() public {
         // 10**-6 base tokens = $1
-        // 10**-3 speculative tokens = $1
+        // 10**3 speculative tokens = $1
         uint256 _upperBound = 10**(18 - 9);
         Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), 18, 18, _upperBound));
         Pair _pair = Pair(_lendgine.pair());
@@ -201,7 +201,7 @@ contract InvariantTest is TestHelper {
 
     function testLowConversionPriceMax() public {
         // 10**-6 base tokens = $1
-        // 10**-3 speculative tokens = $1
+        // 10**3 speculative tokens = $1
         uint256 _upperBound = 10**(18 - 9);
         Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), 18, 18, _upperBound));
         Pair _pair = Pair(_lendgine.pair());
@@ -221,7 +221,7 @@ contract InvariantTest is TestHelper {
 
     function testLowConversionPriceLow() public {
         // 10**-6 base tokens = $1
-        // 10**-3 speculative tokens = $1
+        // 10**3 speculative tokens = $1
         uint256 _upperBound = 10**(18 - 9);
         Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), 18, 18, _upperBound));
         Pair _pair = Pair(_lendgine.pair());
