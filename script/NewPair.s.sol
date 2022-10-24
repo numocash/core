@@ -15,7 +15,7 @@ contract DeployScript is Script {
 
         uint256 pk = vm.envUint("PRIVATE_KEY");
         vm.broadcast(pk);
-        address lendgine = Factory(factory).createLendgine(base, speculative, upperBound);
+        address lendgine = Factory(factory).createLendgine(base, speculative, 18, 18, upperBound);
 
         address pair = Lendgine(lendgine).pair();
 

@@ -14,6 +14,8 @@ contract Factory is IFactory {
     event LendgineCreated(
         address indexed base,
         address indexed speculative,
+        uint256 baseScaleFactor,
+        uint256 speculativeScaleFactor,
         uint256 indexed upperBound,
         address lendgine
     );
@@ -33,7 +35,9 @@ contract Factory is IFactory {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IFactory
-    mapping(address => mapping(address => mapping(uint256 => address))) public override getLendgine;
+    mapping(address => mapping(address => mapping(uint256 => mapping(uint256 => mapping(uint256 => address)))))
+        public
+        override getLendgine;
 
     /*//////////////////////////////////////////////////////////////
                         TEMPORARY DEPLOY STORAGE
@@ -42,6 +46,8 @@ contract Factory is IFactory {
     struct Parameters {
         address base;
         address speculative;
+        uint256 baseScaleFactor;
+        uint256 speculativeScaleFactor;
         uint256 upperBound;
     }
 
@@ -56,19 +62,32 @@ contract Factory is IFactory {
     function createLendgine(
         address base,
         address speculative,
+        uint256 baseScaleFactor,
+        uint256 speculativeScaleFactor,
         uint256 upperBound
     ) external override returns (address lendgine) {
         if (speculative == base) revert SameTokenError();
         if (speculative == address(0) || base == address(0)) revert ZeroAddressError();
-        if (getLendgine[base][speculative][upperBound] != address(0)) revert DeployedError();
+        if (getLendgine[base][speculative][baseScaleFactor][speculativeScaleFactor][upperBound] != address(0))
+            revert DeployedError();
 
-        parameters = Parameters({ base: base, speculative: speculative, upperBound: upperBound });
-        lendgine = address(new Lendgine{ salt: keccak256(abi.encode(base, speculative, upperBound)) }());
+        parameters = Parameters({
+            base: base,
+            speculative: speculative,
+            baseScaleFactor: baseScaleFactor,
+            speculativeScaleFactor: speculativeScaleFactor,
+            upperBound: upperBound
+        });
+        lendgine = address(
+            new Lendgine{
+                salt: keccak256(abi.encode(base, speculative, baseScaleFactor, speculativeScaleFactor, upperBound))
+            }()
+        );
 
         delete parameters;
 
-        getLendgine[base][speculative][upperBound] = lendgine;
+        getLendgine[base][speculative][baseScaleFactor][speculativeScaleFactor][upperBound] = lendgine;
 
-        emit LendgineCreated(base, speculative, upperBound, lendgine);
+        emit LendgineCreated(base, speculative, baseScaleFactor, speculativeScaleFactor, upperBound, lendgine);
     }
 }

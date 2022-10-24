@@ -123,7 +123,7 @@ contract InvariantTest is TestHelper {
         // 10**6 base tokens = $1
         // 10**-3 speculative tokens = $1
         uint256 _upperBound = 10**(9 + 18);
-        Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), _upperBound));
+        Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), 18, 18, _upperBound));
         Pair _pair = Pair(_lendgine.pair());
 
         uint256 liquidity = 1 ether;
@@ -143,7 +143,7 @@ contract InvariantTest is TestHelper {
         // 10**6 base tokens = $1
         // 10**-3 speculative tokens = $1
         uint256 _upperBound = 10**(9 + 18);
-        Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), _upperBound));
+        Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), 18, 18, _upperBound));
         Pair _pair = Pair(_lendgine.pair());
 
         uint256 liquidity = 1 ether;
@@ -163,7 +163,7 @@ contract InvariantTest is TestHelper {
         // 10**6 base tokens = $1
         // 10**-3 speculative tokens = $1
         uint256 _upperBound = 10**(9 + 18);
-        Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), _upperBound));
+        Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), 18, 18, _upperBound));
         Pair _pair = Pair(_lendgine.pair());
 
         uint256 liquidity = 1 ether;
@@ -181,9 +181,9 @@ contract InvariantTest is TestHelper {
 
     function testLowConversionBaseline() public {
         // 10**-6 base tokens = $1
-        // 10**-3 speculative tokens = $1
+        // 10**3 speculative tokens = $1
         uint256 _upperBound = 10**(18 - 9);
-        Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), _upperBound));
+        Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), 18, 18, _upperBound));
         Pair _pair = Pair(_lendgine.pair());
 
         uint256 liquidity = 1 ether;
@@ -201,9 +201,9 @@ contract InvariantTest is TestHelper {
 
     function testLowConversionPriceMax() public {
         // 10**-6 base tokens = $1
-        // 10**-3 speculative tokens = $1
+        // 10**3 speculative tokens = $1
         uint256 _upperBound = 10**(18 - 9);
-        Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), _upperBound));
+        Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), 18, 18, _upperBound));
         Pair _pair = Pair(_lendgine.pair());
 
         uint256 liquidity = 1 ether;
@@ -221,9 +221,9 @@ contract InvariantTest is TestHelper {
 
     function testLowConversionPriceLow() public {
         // 10**-6 base tokens = $1
-        // 10**-3 speculative tokens = $1
+        // 10**3 speculative tokens = $1
         uint256 _upperBound = 10**(18 - 9);
-        Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), _upperBound));
+        Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), 18, 18, _upperBound));
         Pair _pair = Pair(_lendgine.pair());
 
         uint256 liquidity = 1 ether;
@@ -237,5 +237,31 @@ contract InvariantTest is TestHelper {
 
         console2.log("price of 1 ether LP in $:", value / conversion);
         console2.log("max TVL of pool in $", PRBMath.mulDiv(value, maxTokens, conversion * 1 ether));
+    }
+
+    function testLowDecimalsBase() public {
+        uint256 _upperBound = 5 ether;
+        Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), 9, 18, _upperBound));
+        Pair _pair = Pair(_lendgine.pair());
+
+        uint256 liquidity = 1 ether;
+        uint256 price = 1 ether;
+
+        (uint256 r0, uint256 r1) = priceToReserves(price, liquidity, _upperBound);
+
+        _pairMint(r0 / 10**9, r1, liquidity, cuh, _pair);
+    }
+
+    function testLowDecimalsSpeculative() public {
+        uint256 _upperBound = 5 ether;
+        Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), 18, 9, _upperBound));
+        Pair _pair = Pair(_lendgine.pair());
+
+        uint256 liquidity = 1 ether;
+        uint256 price = 1 ether;
+
+        (uint256 r0, uint256 r1) = priceToReserves(price, liquidity, _upperBound);
+
+        _pairMint(r0, r1 / 10**9, liquidity, cuh, _pair);
     }
 }
