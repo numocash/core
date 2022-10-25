@@ -31,6 +31,10 @@ interface IFactory {
             uint256 upperBound
         );
 
+    /// @notice Pair address used to pass to the lendgine, set transiently during pool creation
+    /// @dev Called by the lendgine constructor
+    function pair() external view returns (address);
+
     /// @notice Deploys a lendgine contract by transiently setting the parameters storage slots
     /// and clearing it after the pool has been deployed
     function createLendgine(

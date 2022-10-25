@@ -59,7 +59,8 @@ contract Factory is IFactory {
     /// @inheritdoc IFactory
     Parameters public override pairParameters;
 
-    address public pair;
+    /// @inheritdoc IFactory
+    address public override pair;
 
     /*//////////////////////////////////////////////////////////////
                               FACTORY LOGIC
