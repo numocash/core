@@ -123,8 +123,8 @@ contract InvariantTest is TestHelper {
         // 10**6 base tokens = $1
         // 10**-3 speculative tokens = $1
         uint256 _upperBound = 10**(9 + 18);
-        Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), 18, 18, _upperBound));
-        Pair _pair = Pair(_lendgine.pair());
+        (, address _pair) = factory.createLendgine(address(base), address(speculative), 18, 18, _upperBound);
+        Pair pair = Pair(_pair);
 
         uint256 liquidity = 1 ether;
         uint256 price = _upperBound / 10;
@@ -133,7 +133,7 @@ contract InvariantTest is TestHelper {
         (uint256 r0, uint256 r1) = priceToReserves(price, liquidity, _upperBound);
 
         uint256 value = priceToLPValue(price, _upperBound);
-        _pairMint(r0, r1, liquidity, cuh, _pair);
+        _pairMint(r0, r1, liquidity, cuh, pair);
 
         console2.log("price of 1 ether LP in $:", value / conversion);
         console2.log("max TVL of pool in $", PRBMath.mulDiv(value, maxTokens, conversion * 1 ether));
@@ -143,8 +143,8 @@ contract InvariantTest is TestHelper {
         // 10**6 base tokens = $1
         // 10**-3 speculative tokens = $1
         uint256 _upperBound = 10**(9 + 18);
-        Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), 18, 18, _upperBound));
-        Pair _pair = Pair(_lendgine.pair());
+        (, address _pair) = factory.createLendgine(address(base), address(speculative), 18, 18, _upperBound);
+        Pair pair = Pair(_pair);
 
         uint256 liquidity = 1 ether;
         uint256 price = _upperBound;
@@ -153,7 +153,7 @@ contract InvariantTest is TestHelper {
         (uint256 r0, uint256 r1) = priceToReserves(price, liquidity, _upperBound);
 
         uint256 value = priceToLPValue(price, _upperBound);
-        _pairMint(r0, r1, liquidity, cuh, _pair);
+        _pairMint(r0, r1, liquidity, cuh, pair);
 
         console2.log("price of 1 ether LP in $:", value / conversion);
         console2.log("max TVL of pool in $", PRBMath.mulDiv(value, maxTokens, conversion * 1 ether));
@@ -163,8 +163,8 @@ contract InvariantTest is TestHelper {
         // 10**6 base tokens = $1
         // 10**-3 speculative tokens = $1
         uint256 _upperBound = 10**(9 + 18);
-        Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), 18, 18, _upperBound));
-        Pair _pair = Pair(_lendgine.pair());
+        (, address _pair) = factory.createLendgine(address(base), address(speculative), 18, 18, _upperBound);
+        Pair pair = Pair(_pair);
 
         uint256 liquidity = 1 ether;
         uint256 price = _upperBound / 10**6;
@@ -173,7 +173,7 @@ contract InvariantTest is TestHelper {
         (uint256 r0, uint256 r1) = priceToReserves(price, liquidity, _upperBound);
 
         uint256 value = priceToLPValue(price, _upperBound);
-        _pairMint(r0, r1, liquidity, cuh, _pair);
+        _pairMint(r0, r1, liquidity, cuh, pair);
 
         console2.log("price of 1 ether LP in $:", value / conversion);
         console2.log("max TVL of pool in $", PRBMath.mulDiv(value, maxTokens, conversion * 1 ether));
@@ -183,8 +183,8 @@ contract InvariantTest is TestHelper {
         // 10**-6 base tokens = $1
         // 10**3 speculative tokens = $1
         uint256 _upperBound = 10**(18 - 9);
-        Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), 18, 18, _upperBound));
-        Pair _pair = Pair(_lendgine.pair());
+        (, address _pair) = factory.createLendgine(address(base), address(speculative), 18, 18, _upperBound);
+        Pair pair = Pair(_pair);
 
         uint256 liquidity = 1 ether;
         uint256 price = _upperBound / 10;
@@ -193,7 +193,7 @@ contract InvariantTest is TestHelper {
         (uint256 r0, uint256 r1) = priceToReserves(price, liquidity, _upperBound);
 
         uint256 value = priceToLPValue(price, _upperBound);
-        _pairMint(r0, r1, liquidity, cuh, _pair);
+        _pairMint(r0, r1, liquidity, cuh, pair);
 
         console2.log("price of 1 ether LP in $:", value / conversion);
         console2.log("max TVL of pool in $", PRBMath.mulDiv(value, maxTokens, conversion * 1 ether));
@@ -203,8 +203,8 @@ contract InvariantTest is TestHelper {
         // 10**-6 base tokens = $1
         // 10**3 speculative tokens = $1
         uint256 _upperBound = 10**(18 - 9);
-        Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), 18, 18, _upperBound));
-        Pair _pair = Pair(_lendgine.pair());
+        (, address _pair) = factory.createLendgine(address(base), address(speculative), 18, 18, _upperBound);
+        Pair pair = Pair(_pair);
 
         uint256 liquidity = 1 ether;
         uint256 price = _upperBound;
@@ -213,7 +213,7 @@ contract InvariantTest is TestHelper {
         (uint256 r0, uint256 r1) = priceToReserves(price, liquidity, _upperBound);
 
         uint256 value = priceToLPValue(price, _upperBound);
-        _pairMint(r0, r1, liquidity, cuh, _pair);
+        _pairMint(r0, r1, liquidity, cuh, pair);
 
         console2.log("price of 1 ether LP in $:", value / conversion);
         console2.log("max TVL of pool in $", PRBMath.mulDiv(value, maxTokens, conversion * 1 ether));
@@ -223,8 +223,8 @@ contract InvariantTest is TestHelper {
         // 10**-6 base tokens = $1
         // 10**3 speculative tokens = $1
         uint256 _upperBound = 10**(18 - 9);
-        Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), 18, 18, _upperBound));
-        Pair _pair = Pair(_lendgine.pair());
+        (, address _pair) = factory.createLendgine(address(base), address(speculative), 18, 18, _upperBound);
+        Pair pair = Pair(_pair);
 
         uint256 liquidity = 1 ether;
         uint256 price = _upperBound / 10**6;
@@ -233,7 +233,7 @@ contract InvariantTest is TestHelper {
         (uint256 r0, uint256 r1) = priceToReserves(price, liquidity, _upperBound);
 
         uint256 value = priceToLPValue(price, _upperBound);
-        _pairMint(r0, r1, liquidity, cuh, _pair);
+        _pairMint(r0, r1, liquidity, cuh, pair);
 
         console2.log("price of 1 ether LP in $:", value / conversion);
         console2.log("max TVL of pool in $", PRBMath.mulDiv(value, maxTokens, conversion * 1 ether));
@@ -241,27 +241,27 @@ contract InvariantTest is TestHelper {
 
     function testLowDecimalsBase() public {
         uint256 _upperBound = 5 ether;
-        Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), 9, 18, _upperBound));
-        Pair _pair = Pair(_lendgine.pair());
+        (, address _pair) = factory.createLendgine(address(base), address(speculative), 9, 18, _upperBound);
+        Pair pair = Pair(_pair);
 
         uint256 liquidity = 1 ether;
         uint256 price = 1 ether;
 
         (uint256 r0, uint256 r1) = priceToReserves(price, liquidity, _upperBound);
 
-        _pairMint(r0 / 10**9, r1, liquidity, cuh, _pair);
+        _pairMint(r0 / 10**9, r1, liquidity, cuh, pair);
     }
 
     function testLowDecimalsSpeculative() public {
         uint256 _upperBound = 5 ether;
-        Lendgine _lendgine = Lendgine(factory.createLendgine(address(base), address(speculative), 18, 9, _upperBound));
-        Pair _pair = Pair(_lendgine.pair());
+        (, address _pair) = factory.createLendgine(address(base), address(speculative), 18, 9, _upperBound);
+        Pair pair = Pair(_pair);
 
         uint256 liquidity = 1 ether;
         uint256 price = 1 ether;
 
         (uint256 r0, uint256 r1) = priceToReserves(price, liquidity, _upperBound);
 
-        _pairMint(r0, r1 / 10**9, liquidity, cuh, _pair);
+        _pairMint(r0, r1 / 10**9, liquidity, cuh, pair);
     }
 }

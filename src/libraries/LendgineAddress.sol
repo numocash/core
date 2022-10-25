@@ -2,6 +2,7 @@
 pragma solidity >=0.5.0;
 
 import { Lendgine } from "../Lendgine.sol";
+import { Pair } from "../Pair.sol";
 
 /// @notice Library for determining addresses with pure functions
 /// @author Kyle Scott (https://github.com/Numoen/core/blob/master/src/libraries/LendgineAddress.sol)
@@ -34,7 +35,7 @@ library LendgineAddress {
             });
     }
 
-    function computeAddress(
+    function computeLendgineAddress(
         address factory,
         address base,
         address speculative,
@@ -53,6 +54,33 @@ library LendgineAddress {
                                 abi.encode(base, speculative, baseScaleFactor, speculativeScaleFactor, upperBound)
                             ),
                             keccak256(type(Lendgine).creationCode)
+                        )
+                    )
+                )
+            )
+        );
+        return out;
+    }
+
+    function computePairAddress(
+        address factory,
+        address base,
+        address speculative,
+        uint256 baseScaleFactor,
+        uint256 speculativeScaleFactor,
+        uint256 upperBound
+    ) internal pure returns (address) {
+        address out = address(
+            uint160(
+                uint256(
+                    keccak256(
+                        abi.encodePacked(
+                            hex"ff",
+                            factory,
+                            keccak256(
+                                abi.encode(base, speculative, baseScaleFactor, speculativeScaleFactor, upperBound)
+                            ),
+                            keccak256(type(Pair).creationCode)
                         )
                     )
                 )

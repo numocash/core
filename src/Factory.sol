@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import { Lendgine } from "./Lendgine.sol";
 import { Pair } from "./Pair.sol";
+import { LendgineAddress } from "./libraries/LendgineAddress.sol";
 
 import { IFactory } from "./interfaces/IFactory.sol";
 
@@ -17,7 +18,8 @@ contract Factory is IFactory {
         uint256 baseScaleFactor,
         uint256 speculativeScaleFactor,
         uint256 indexed upperBound,
-        address lendgine
+        address lendgine,
+        address pair
     );
 
     /*//////////////////////////////////////////////////////////////
@@ -29,6 +31,8 @@ contract Factory is IFactory {
     error ZeroAddressError();
 
     error DeployedError();
+
+    error AddressError();
 
     /*//////////////////////////////////////////////////////////////
                             FACTORY STORAGE
@@ -44,6 +48,7 @@ contract Factory is IFactory {
     //////////////////////////////////////////////////////////////*/
 
     struct Parameters {
+        address lendgine;
         address base;
         address speculative;
         uint256 baseScaleFactor;
@@ -52,7 +57,9 @@ contract Factory is IFactory {
     }
 
     /// @inheritdoc IFactory
-    Parameters public override parameters;
+    Parameters public override pairParameters;
+
+    address public pair;
 
     /*//////////////////////////////////////////////////////////////
                               FACTORY LOGIC
@@ -65,29 +72,49 @@ contract Factory is IFactory {
         uint256 baseScaleFactor,
         uint256 speculativeScaleFactor,
         uint256 upperBound
-    ) external override returns (address lendgine) {
+    ) external override returns (address, address) {
         if (speculative == base) revert SameTokenError();
         if (speculative == address(0) || base == address(0)) revert ZeroAddressError();
         if (getLendgine[base][speculative][baseScaleFactor][speculativeScaleFactor][upperBound] != address(0))
             revert DeployedError();
 
-        parameters = Parameters({
+        address lendgineEstimate = LendgineAddress.computeLendgineAddress(
+            address(this),
+            base,
+            speculative,
+            baseScaleFactor,
+            speculativeScaleFactor,
+            upperBound
+        );
+
+        pairParameters = Parameters({
+            lendgine: lendgineEstimate,
             base: base,
             speculative: speculative,
             baseScaleFactor: baseScaleFactor,
             speculativeScaleFactor: speculativeScaleFactor,
             upperBound: upperBound
         });
-        lendgine = address(
+
+        address _pair = address(
+            new Pair{
+                salt: keccak256(abi.encode(base, speculative, baseScaleFactor, speculativeScaleFactor, upperBound))
+            }()
+        );
+        pair = _pair;
+
+        address _lendgine = address(
             new Lendgine{
                 salt: keccak256(abi.encode(base, speculative, baseScaleFactor, speculativeScaleFactor, upperBound))
             }()
         );
 
-        delete parameters;
+        delete pair;
+        delete pairParameters;
 
-        getLendgine[base][speculative][baseScaleFactor][speculativeScaleFactor][upperBound] = lendgine;
-
-        emit LendgineCreated(base, speculative, baseScaleFactor, speculativeScaleFactor, upperBound, lendgine);
+        if (lendgineEstimate != _lendgine) revert AddressError();
+        getLendgine[base][speculative][baseScaleFactor][speculativeScaleFactor][upperBound] = _lendgine;
+        emit LendgineCreated(base, speculative, baseScaleFactor, speculativeScaleFactor, upperBound, _lendgine, _pair);
+        return (_lendgine, _pair);
     }
 }

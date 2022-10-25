@@ -14,7 +14,16 @@ contract DepositTest is TestHelper {
     }
 
     function testDeployAddress() public {
-        address estimate = LendgineAddress.computeAddress(
+        address estimate = LendgineAddress.computeLendgineAddress(
+            address(factory),
+            address(base),
+            address(speculative),
+            18,
+            18,
+            upperBound
+        );
+
+        address pairEstimate = LendgineAddress.computePairAddress(
             address(factory),
             address(base),
             address(speculative),
@@ -27,12 +36,28 @@ contract DepositTest is TestHelper {
 
         assertEq(address(lendgine), estimate);
         assertEq(address(lendgine), factoryAddress);
+        assertEq(address(pair), pairEstimate);
     }
 
     function testDeployAddress2() public {
-        address _lendgine = factory.createLendgine(address(speculative), address(base), 18, 18, upperBound);
+        (address _lendgine, address _pair) = factory.createLendgine(
+            address(speculative),
+            address(base),
+            18,
+            18,
+            upperBound
+        );
 
-        address estimate = LendgineAddress.computeAddress(
+        address estimate = LendgineAddress.computeLendgineAddress(
+            address(factory),
+            address(speculative),
+            address(base),
+            18,
+            18,
+            upperBound
+        );
+
+        address pairEstimate = LendgineAddress.computePairAddress(
             address(factory),
             address(speculative),
             address(base),
@@ -46,5 +71,6 @@ contract DepositTest is TestHelper {
         assertEq(_lendgine, estimate);
         assertEq(_lendgine, factoryAddress);
         assertTrue(_lendgine != address(lendgine));
+        assertEq(_pair, pairEstimate);
     }
 }
