@@ -105,7 +105,7 @@ contract Lendgine is ERC20, JumpRate, ILendgine {
     constructor() {
         factory = msg.sender;
 
-        pair = address(new Pair{ salt: keccak256(abi.encode(address(this))) }(msg.sender));
+        pair = Factory(msg.sender).pair();
     }
 
     /*//////////////////////////////////////////////////////////////

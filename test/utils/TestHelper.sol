@@ -44,11 +44,15 @@ abstract contract TestHelper is Test, CallbackHelper {
     function _setUp() internal {
         factory = new Factory();
 
-        address _lendgine = factory.createLendgine(address(base), address(speculative), 18, 18, upperBound);
+        (address _lendgine, address _pair) = factory.createLendgine(
+            address(base),
+            address(speculative),
+            18,
+            18,
+            upperBound
+        );
 
         lendgine = Lendgine(_lendgine);
-
-        address _pair = lendgine.pair();
 
         pair = Pair(_pair);
     }

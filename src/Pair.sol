@@ -94,14 +94,14 @@ contract Pair is IPair {
                                CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
-    constructor(address _factory) {
-        lendgine = msg.sender;
-        factory = _factory;
+    constructor() {
+        factory = msg.sender;
 
         uint256 _baseScaleFactor;
         uint256 _speculativeScaleFactor;
 
-        (base, speculative, _baseScaleFactor, _speculativeScaleFactor, upperBound) = Factory(factory).parameters();
+        (lendgine, base, speculative, _baseScaleFactor, _speculativeScaleFactor, upperBound) = Factory(msg.sender)
+            .pairParameters();
 
         if (_baseScaleFactor > 18 || _baseScaleFactor < 6) revert InvariantError();
         if (_speculativeScaleFactor > 18 || _speculativeScaleFactor < 6) revert InvariantError();

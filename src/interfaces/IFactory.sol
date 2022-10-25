@@ -19,10 +19,11 @@ interface IFactory {
     /// @notice Get the parameters to be used in constructing the lendgine and pair, set
     /// transiently during pool creation
     /// @dev Called by the pair constructor to fetch the parameters of the pair
-    function parameters()
+    function pairParameters()
         external
         view
         returns (
+            address lendgine,
             address base,
             address speculative,
             uint256 baseScaleFactor,
@@ -38,5 +39,5 @@ interface IFactory {
         uint256 baseScaleFactor,
         uint256 speculativeScaleFactor,
         uint256 upperBound
-    ) external returns (address lendgine);
+    ) external returns (address, address);
 }
