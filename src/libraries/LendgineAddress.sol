@@ -9,6 +9,11 @@ import { Pair } from "../Pair.sol";
 /// @author Modified from Uniswap
 /// (https://github.com/Uniswap/v3-periphery/blob/main/contracts/libraries/PoolAddress.sol)
 library LendgineAddress {
+    bytes32 internal constant LENDGINE_INIT_CODE_HASH =
+        0xA532B0F14791699BF97EBE15D445AFF2B1793689486FE8ED9E4532991CB543CD;
+
+    bytes32 internal constant PAIR_INIT_CODE_HASH = 0xBC720A328756224CCB8FE0FC12A950BFCCD74FEECF80442BF9DAE03352C84DCB;
+
     /// @notice The identifying key of the pool
     struct LendgineKey {
         address base;
@@ -53,7 +58,7 @@ library LendgineAddress {
                             keccak256(
                                 abi.encode(base, speculative, baseScaleFactor, speculativeScaleFactor, upperBound)
                             ),
-                            keccak256(type(Lendgine).creationCode)
+                            LENDGINE_INIT_CODE_HASH
                         )
                     )
                 )
@@ -80,7 +85,7 @@ library LendgineAddress {
                             keccak256(
                                 abi.encode(base, speculative, baseScaleFactor, speculativeScaleFactor, upperBound)
                             ),
-                            keccak256(type(Pair).creationCode)
+                            PAIR_INIT_CODE_HASH
                         )
                     )
                 )
