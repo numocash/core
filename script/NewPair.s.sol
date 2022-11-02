@@ -9,9 +9,10 @@ import { LendgineAddress } from "../src/libraries/LendgineAddress.sol";
 
 contract DeployScript is Script {
     function run() public {
-        address factory = 0xa284973f0EB3542Af62dB35E65766D0ef9a4c71b;
-        address base = 0x765DE816845861e75A25fCA122bb6898B8B1282a;
-        address speculative = 0x471EcE3750Da237f93B8E339c536989b8978a438;
+        address factory = 0x2A4a8ea165aa1d7F45d7ac03BFd6Fa58F9F5F8CC;
+
+        address base = 0x471EcE3750Da237f93B8E339c536989b8978a438;
+        address speculative = 0x765DE816845861e75A25fCA122bb6898B8B1282a;
         uint256 upperBound = 5 ether;
 
         uint256 pk = vm.envUint("PRIVATE_KEY");
