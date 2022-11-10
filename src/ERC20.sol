@@ -58,7 +58,7 @@ abstract contract ERC20 {
                                ERC20 LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function approve(address spender, uint256 amount) public virtual returns (bool) {
+    function approve(address spender, uint256 amount) external virtual returns (bool) {
         allowance[msg.sender][spender] = amount;
 
         emit Approval(msg.sender, spender, amount);
@@ -66,7 +66,7 @@ abstract contract ERC20 {
         return true;
     }
 
-    function transfer(address to, uint256 amount) public virtual returns (bool) {
+    function transfer(address to, uint256 amount) external virtual returns (bool) {
         balanceOf[msg.sender] -= amount;
 
         // Cannot overflow because the sum of all user
@@ -84,7 +84,7 @@ abstract contract ERC20 {
         address from,
         address to,
         uint256 amount
-    ) public virtual returns (bool) {
+    ) external virtual returns (bool) {
         uint256 allowed = allowance[from][msg.sender]; // Saves gas for limited approvals.
 
         if (allowed != type(uint256).max) allowance[from][msg.sender] = allowed - amount;
@@ -114,7 +114,7 @@ abstract contract ERC20 {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) public virtual {
+    ) external virtual {
         require(deadline >= block.timestamp, "PERMIT_DEADLINE_EXPIRED");
 
         // Unchecked because the only math done is incrementing
