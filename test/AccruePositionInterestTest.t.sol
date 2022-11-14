@@ -100,7 +100,7 @@ contract AccruePositionInterestTest is TestHelper {
 
     function testAccrueStaggeredDeposits() public {
         _mint(5 ether, cuh);
-        pair.burn(cuh, 0.5 ether, 4 ether, 0.5 ether);
+        pair.burn(cuh, 0.5 ether);
         vm.warp(365 days + 1);
 
         _deposit(1 ether, 8 ether, 1 ether, dennis);

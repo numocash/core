@@ -145,13 +145,13 @@ contract Pair is IPair {
     }
 
     /// @inheritdoc IPair
-    function burn(
-        address to,
-        uint256 amount0,
-        uint256 amount1,
-        uint256 liquidity
-    ) external override lock {
-        if (!verifyInvariant(amount0, amount1, liquidity)) revert InvariantError();
+    function burn(address to, uint256 liquidity) external override lock {
+        (uint256 balance0, uint256 balance1) = balances();
+        uint256 _totalSupply = totalSupply;
+        if (!verifyInvariant(balance0, balance1, totalSupply)) revert InvariantError();
+
+        uint256 amount0 = (balance0 * liquidity) / _totalSupply;
+        uint256 amount1 = (balance1 * liquidity) / _totalSupply;
 
         if (amount0 == 0 && amount1 == 0) revert InsufficientOutputError();
         _burn(liquidity);
