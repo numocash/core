@@ -56,7 +56,7 @@ interface IPair {
     /// @notice Destroy a liquidity providing position and receive the underlying balances
     /// @param to The address to receive the underlying balances
     /// @param liquidity The amount of liquidity shares to burn
-    function burn(address to, uint256 liquidity) external;
+    function burn(address to, uint256 liquidity) external returns (uint256 amount0, uint256 amount1);
 
     /// @notice Exchange between the `base` and `speculative` tokens, either accepts or rejects the proposed trade
     /// @dev The tokens that are to be sent to be sent in for the swap are required

@@ -145,7 +145,7 @@ contract Pair is IPair {
     }
 
     /// @inheritdoc IPair
-    function burn(address to, uint256 liquidity) external override lock {
+    function burn(address to, uint256 liquidity) external override lock returns (uint256, uint256) {
         (uint256 balance0, uint256 balance1) = balances();
         uint256 _totalSupply = totalSupply;
         if (!verifyInvariant(balance0, balance1, totalSupply)) revert InvariantError();
@@ -160,6 +160,7 @@ contract Pair is IPair {
         SafeTransferLib.safeTransfer(speculative, to, amount1);
 
         emit Burn(msg.sender, amount0, amount1, liquidity, to);
+        return (amount0, amount1);
     }
 
     /// @inheritdoc IPair
