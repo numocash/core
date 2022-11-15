@@ -232,7 +232,7 @@ contract InvariantTest is TestHelper {
 
         pair.swap(cuh, 0, amountSOut);
 
-        (uint256 balanceBase, uint256 balanceSpec) = pair.balances();
+        (uint256 balanceBase, uint256 balanceSpec) = pair.reserves();
 
         assertEq(balanceBase, amountBIn);
         assertEq(balanceSpec, 0);
@@ -250,8 +250,20 @@ contract InvariantTest is TestHelper {
         speculative.transfer(address(pair), 4 ether);
         vm.stopPrank();
 
-        vm.expectRevert(Pair.InvariantError.selector);
         pair.burn(cuh, 1 ether);
+
+        assertEq(base.balanceOf(cuh), 9 ether);
+        assertEq(speculative.balanceOf(cuh), 4 ether);
+
+        assertEq(pair.totalSupply(), 0 ether);
+        assertEq(pair.buffer(), 0 ether);
+
+        assertEq(base.balanceOf(address(pair)), 9 ether);
+        assertEq(speculative.balanceOf(address(pair)), 4 ether);
+
+        pair.skim(dennis);
+        assertEq(base.balanceOf(dennis), 9 ether);
+        assertEq(speculative.balanceOf(dennis), 4 ether);
     }
 
     function testMintWithDonation() public {

@@ -36,6 +36,12 @@ interface IPair {
     /// balance schematic, this buffer is used to express tokens that are about to be burned, deposited, or withdrawn
     function buffer() external view returns (uint256);
 
+    /// @notice The amount of base tokens in the pool
+    function reserve0() external view returns (uint120);
+
+    /// @notice The amount of speculative tokens in the pool
+    function reserve1() external view returns (uint120);
+
     /// @notice Verifies that the given amounts satisfy the trading invariant
     /// @param r0 The amount of `base` tokens
     /// @param r1 The amount of `speculative` tokens
@@ -70,9 +76,11 @@ interface IPair {
         uint256 amount1Out
     ) external;
 
-    /// @notice Returns the `base` and `speculative` balances of the pool
-    /// @dev Not to be relied upon anywhere else because of a potential readonly reentracy
-    function balances() external view returns (uint256, uint256);
+    /// @notice Removes any tokens that were donated to the pool;
+    function skim(address to) external;
+
+    /// @notice Returns the `base` and `speculative` reserves of the pool
+    function reserves() external view returns (uint256, uint256);
 
     /// @notice Adds liquidity shares to the buffer
     /// @dev Only callable by the lendgine, this is liquidity that is withdrawn from the lendgine but not the pair
