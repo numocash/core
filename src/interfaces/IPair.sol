@@ -79,9 +79,6 @@ interface IPair {
     /// @notice Removes any tokens that were donated to the pool;
     function skim(address to) external;
 
-    /// @notice Returns the `base` and `speculative` reserves of the pool
-    function reserves() external view returns (uint256, uint256);
-
     /// @notice Adds liquidity shares to the buffer
     /// @dev Only callable by the lendgine, this is liquidity that is withdrawn from the lendgine but not the pair
     /// @param amount The amount of liquidity shares to add

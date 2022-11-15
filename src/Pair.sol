@@ -7,6 +7,7 @@ import { Lendgine } from "./Lendgine.sol";
 import { IPair } from "./interfaces/IPair.sol";
 
 import { SafeTransferLib } from "./libraries/SafeTransferLib.sol";
+import { SafeCast } from "./libraries/SafeCast.sol";
 import { PRBMathUD60x18 } from "prb-math/PRBMathUD60x18.sol";
 import { PRBMath } from "prb-math/PRBMath.sol";
 
@@ -144,17 +145,17 @@ contract Pair is IPair {
     function mint(uint256 liquidity) external override lock {
         if (liquidity == 0) revert InsufficientOutputError();
 
-        (uint256 balance0, uint256 balance1) = balances();
+        (uint256 balance0, uint256 balance1) = _balances();
         if (!verifyInvariant(balance0, balance1, liquidity + totalSupply)) revert InvariantError();
         _mint(liquidity);
-        update(balance0, balance1);
+        _update(balance0, balance1);
 
         emit Mint(msg.sender, liquidity);
     }
 
     /// @inheritdoc IPair
     function burn(address to, uint256 liquidity) external override lock returns (uint256, uint256) {
-        (uint256 r0, uint256 r1) = reserves();
+        (uint256 r0, uint256 r1) = _reserves();
         uint256 _totalSupply = totalSupply;
 
         uint256 amount0 = PRBMath.mulDiv(r0, liquidity, _totalSupply);
@@ -162,7 +163,7 @@ contract Pair is IPair {
 
         if (amount0 == 0 && amount1 == 0) revert InsufficientOutputError();
         _burn(liquidity);
-        update(r0 - amount0, r1 - amount1);
+        _update(r0 - amount0, r1 - amount1);
 
         SafeTransferLib.safeTransfer(base, to, amount0);
         SafeTransferLib.safeTransfer(speculative, to, amount1);
@@ -182,45 +183,36 @@ contract Pair is IPair {
         if (amount0Out > 0) SafeTransferLib.safeTransfer(base, to, amount0Out);
         if (amount1Out > 0) SafeTransferLib.safeTransfer(speculative, to, amount1Out);
 
-        (uint256 balance0, uint256 balance1) = balances();
+        (uint256 balance0, uint256 balance1) = _balances();
         if (!verifyInvariant(balance0, balance1, totalSupply)) revert InvariantError();
-        update(balance0, balance1);
+        _update(balance0, balance1);
 
         emit Swap(msg.sender, amount0Out, amount1Out, to);
     }
 
     /// @inheritdoc IPair
-    function skim(address to) external lock {
-        (uint256 r0, uint256 r1) = reserves();
-        (uint256 balance0, uint256 balance1) = balances();
+    function skim(address to) external override lock {
+        (uint256 r0, uint256 r1) = _reserves();
+        (uint256 balance0, uint256 balance1) = _balances();
 
         if (balance0 > r0) SafeTransferLib.safeTransfer(base, to, balance0 - r0);
         if (balance1 > r1) SafeTransferLib.safeTransfer(speculative, to, balance1 - r1);
     }
 
     /*//////////////////////////////////////////////////////////////
-                                VIEW
-    //////////////////////////////////////////////////////////////*/
-
-    /// @inheritdoc IPair
-    function reserves() public view returns (uint256, uint256) {
-        return (reserve0, reserve1);
-    }
-
-    /*//////////////////////////////////////////////////////////////
                             INTERNAL LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function toUint120(uint256 y) internal pure returns (uint120 z) {
-        require((z = uint120(y)) == y);
+    function _reserves() internal view returns (uint256, uint256) {
+        return (reserve0, reserve1);
     }
 
-    function update(uint256 balance0, uint256 balance1) internal {
-        reserve0 = toUint120(balance0);
-        reserve1 = toUint120(balance1);
+    function _update(uint256 balance0, uint256 balance1) internal {
+        reserve0 = SafeCast.toUint120(balance0);
+        reserve1 = SafeCast.toUint120(balance1);
     }
 
-    function balances() internal view returns (uint256, uint256) {
+    function _balances() internal view returns (uint256, uint256) {
         bool success;
         bytes memory data;
 
@@ -263,7 +255,7 @@ contract Pair is IPair {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IPair
-    function addBuffer(uint256 amount) external override {
+    function addBuffer(uint256 amount) external override lock {
         if (msg.sender != lendgine) revert LendgineError();
         if (amount + buffer > totalSupply) revert BufferError();
 
@@ -271,7 +263,7 @@ contract Pair is IPair {
     }
 
     /// @inheritdoc IPair
-    function removeBuffer(uint256 amount) external override {
+    function removeBuffer(uint256 amount) external override lock {
         if (msg.sender != lendgine) revert LendgineError();
 
         buffer -= amount;

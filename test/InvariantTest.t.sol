@@ -232,7 +232,8 @@ contract InvariantTest is TestHelper {
 
         pair.swap(cuh, 0, amountSOut);
 
-        (uint256 balanceBase, uint256 balanceSpec) = pair.reserves();
+        uint256 balanceBase = pair.reserve0();
+        uint256 balanceSpec = pair.reserve1();
 
         assertEq(balanceBase, amountBIn);
         assertEq(balanceSpec, 0);
