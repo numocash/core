@@ -160,6 +160,7 @@ contract Pair is IPair {
 
         uint256 amount0 = PRBMath.mulDiv(r0, liquidity, _totalSupply);
         uint256 amount1 = PRBMath.mulDiv(r1, liquidity, _totalSupply);
+        if (!verifyInvariant(amount0, amount1, liquidity)) revert InvariantError();
 
         if (amount0 == 0 && amount1 == 0) revert InsufficientOutputError();
         _burn(liquidity);
