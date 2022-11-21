@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.4;
 
 import { LiquidityMath } from "./LiquidityMath.sol";
 import { PRBMathUD60x18 } from "prb-math/PRBMathUD60x18.sol";

@@ -46,7 +46,7 @@ contract DepositTest is TestHelper {
     function testAccrueOnDeposit() public {
         _deposit(1 ether, 8 ether, 1 ether, cuh);
         _mint(5 ether, cuh);
-        pair.burn(cuh, 0.5 ether, 4 ether, 0.5 ether);
+        pair.burn(cuh, 0.5 ether);
         vm.warp(365 days + 1);
 
         _deposit(1 ether, 8 ether, 1 ether, cuh);
@@ -86,7 +86,7 @@ contract DepositTest is TestHelper {
     function testAccrueOnDepositNewPosition() public {
         _deposit(1 ether, 8 ether, 1 ether, cuh);
         _mint(5 ether, cuh);
-        pair.burn(cuh, 0.5 ether, 4 ether, 0.5 ether);
+        pair.burn(cuh, 0.5 ether);
         vm.warp(365 days + 1);
 
         _deposit(1 ether, 8 ether, 1 ether, dennis);

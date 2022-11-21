@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.4;
 
 /// @notice Modern and gas efficient ERC20 + EIP-2612 implementation.
 /// @author Kyle Scott (https://github.com/numoen/core/blob/master/src/ERC20.sol)
@@ -14,6 +14,12 @@ abstract contract ERC20 {
     event Transfer(address indexed from, address indexed to, uint256 amount);
 
     event Approval(address indexed owner, address indexed spender, uint256 amount);
+
+    /*//////////////////////////////////////////////////////////////
+                                 ERRORS
+    //////////////////////////////////////////////////////////////*/
+
+    error ZeroAddressError();
 
     /*//////////////////////////////////////////////////////////////
                             METADATA STORAGE
@@ -58,7 +64,8 @@ abstract contract ERC20 {
                                ERC20 LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function approve(address spender, uint256 amount) public virtual returns (bool) {
+    function approve(address spender, uint256 amount) external virtual returns (bool) {
+        if (spender == address(0)) revert ZeroAddressError();
         allowance[msg.sender][spender] = amount;
 
         emit Approval(msg.sender, spender, amount);
@@ -66,7 +73,8 @@ abstract contract ERC20 {
         return true;
     }
 
-    function transfer(address to, uint256 amount) public virtual returns (bool) {
+    function transfer(address to, uint256 amount) external virtual returns (bool) {
+        if (to == address(0)) revert ZeroAddressError();
         balanceOf[msg.sender] -= amount;
 
         // Cannot overflow because the sum of all user
@@ -84,7 +92,8 @@ abstract contract ERC20 {
         address from,
         address to,
         uint256 amount
-    ) public virtual returns (bool) {
+    ) external virtual returns (bool) {
+        if (from == address(0) || to == address(0)) revert ZeroAddressError();
         uint256 allowed = allowance[from][msg.sender]; // Saves gas for limited approvals.
 
         if (allowed != type(uint256).max) allowance[from][msg.sender] = allowed - amount;
@@ -114,7 +123,9 @@ abstract contract ERC20 {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) public virtual {
+    ) external virtual {
+        if (owner == address(0) || spender == address(0)) revert ZeroAddressError();
+
         require(deadline >= block.timestamp, "PERMIT_DEADLINE_EXPIRED");
 
         // Unchecked because the only math done is incrementing
@@ -174,6 +185,7 @@ abstract contract ERC20 {
     //////////////////////////////////////////////////////////////*/
 
     function _mint(address to, uint256 amount) internal virtual {
+        if (to == address(0)) revert ZeroAddressError();
         totalSupply += amount;
 
         // Cannot overflow because the sum of all user
@@ -186,6 +198,7 @@ abstract contract ERC20 {
     }
 
     function _burn(address from, uint256 amount) internal virtual {
+        if (from == address(0)) revert ZeroAddressError();
         balanceOf[from] -= amount;
 
         // Cannot underflow because a user's balance

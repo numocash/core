@@ -78,7 +78,7 @@ contract WithdrawTest is TestHelper {
 
     function testAccrueOnWithdraw() public {
         _mint(5 ether, cuh);
-        pair.burn(cuh, 0.5 ether, 4 ether, 0.5 ether);
+        pair.burn(cuh, 0.5 ether);
         vm.warp(365 days + 1);
 
         _withdraw(0.1 ether, cuh);
