@@ -43,6 +43,8 @@ contract WithdrawTest is TestHelper {
 
         assertEq(pair.buffer(), 1 ether);
         assertEq(pair.totalSupply(), 1 ether);
+
+        pair.burn(cuh, 1 ether);
     }
 
     function testZeroBurn() public {
