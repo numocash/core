@@ -1,19 +1,47 @@
 # Numoen Core
 
-Perpetual lending engine
+Contracts for creating a perpetual options market.
 
-# Local Development
+## Deployments
 
-The following assumes the use of `node@>=10`.
+`Factory` has been deployed to `0x7c4f274aeec722b8f93ce1a83e52872bcd11f7d3` on the following networks:
 
-## Install Dependencies
+- Ethereum Goerli Testnet
 
-`yarn install`
+## Installation
 
-## Compile Contracts
+To install with [Foundry](https://github.com/foundry-rs/foundry):
 
-`yarn compile`
+```bash
+forge install numoen/core
+```
 
-## Run Tests
+## Local development
 
-`yarn test`
+This project uses [Foundry](https://github.com/foundry-rs/foundry) as the development framework.
+
+### Dependencies
+
+```bash
+forge install
+```
+
+### Compilation
+
+```bash
+forge build
+```
+
+### Test
+
+```bash
+forge test
+```
+
+### Deployment
+
+Make sure that the network is defined in foundry.toml, then run:
+
+```bash
+./deploy/deploy.sh [network]
+```
