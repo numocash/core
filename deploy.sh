@@ -1,1 +1,7 @@
-forge script script/Deploy.s.sol:DeployScript --rpc-url https://forno.celo.org --broadcast --legacy
+deploy() {
+  NETWORK=$1
+
+	forge script script/Deploy.s.sol -f $NETWORK -vvvv --json --silent --broadcast
+}
+
+deploy $1
