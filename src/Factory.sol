@@ -3,7 +3,6 @@ pragma solidity ^0.8.4;
 
 import { Lendgine } from "./Lendgine.sol";
 import { Pair } from "./Pair.sol";
-import { LendgineAddress } from "./libraries/LendgineAddress.sol";
 
 import { IFactory } from "./interfaces/IFactory.sol";
 
@@ -79,13 +78,21 @@ contract Factory is IFactory {
         if (getLendgine[base][speculative][baseScaleFactor][speculativeScaleFactor][upperBound] != address(0))
             revert DeployedError();
 
-        address lendgineEstimate = LendgineAddress.computeLendgineAddress(
-            address(this),
-            base,
-            speculative,
-            baseScaleFactor,
-            speculativeScaleFactor,
-            upperBound
+        address lendgineEstimate = address(
+            uint160(
+                uint256(
+                    keccak256(
+                        abi.encodePacked(
+                            hex"ff",
+                            address(this),
+                            keccak256(
+                                abi.encode(base, speculative, baseScaleFactor, speculativeScaleFactor, upperBound)
+                            ),
+                            keccak256(type(Lendgine).creationCode)
+                        )
+                    )
+                )
+            )
         );
 
         pairParameters = Parameters({
