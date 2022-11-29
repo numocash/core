@@ -43,5 +43,5 @@ forge test
 Make sure that the network is defined in foundry.toml, then run:
 
 ```bash
-./deploy/deploy.sh [network]
+sh deploy.sh [network]
 ```
