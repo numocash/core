@@ -16,7 +16,7 @@ contract DeployScript is Script {
         uint256 pk = vm.envUint("PRIVATE_KEY");
         vm.broadcast(pk);
 
-        deployed = Factory(create3.deploy(keccak256("Numoen Factory"), type(Factory).creationCode));
+        deployed = Factory(create3.deploy(keccak256("NumoenFactory01"), type(Factory).creationCode));
 
         console2.log("Lendgine initcode hash:", uint256(keccak256(type(Lendgine).creationCode)));
         console2.log("Pair initcode hash:", uint256(keccak256(type(Pair).creationCode)));

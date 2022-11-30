@@ -4,7 +4,7 @@ Contracts for creating a perpetual options market.
 
 ## Deployments
 
-`Factory` has been deployed to `0x7c4f274aeec722b8f93ce1a83e52872bcd11f7d3` on the following networks:
+`Factory` has been deployed to `0x010797814E619634c0A6bbaA9FaCa48FBD0D3E33` on the following networks:
 
 - Ethereum Goerli Testnet
 
