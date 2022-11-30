@@ -5,7 +5,6 @@ import "forge-std/Script.sol";
 import "forge-std/console2.sol";
 import { Factory } from "../src/Factory.sol";
 import { Lendgine } from "../src/Lendgine.sol";
-import { LendgineAddress } from "../src/libraries/LendgineAddress.sol";
 
 contract DeployScript is Script {
     function run() public {
