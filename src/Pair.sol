@@ -128,6 +128,8 @@ contract Pair is IPair {
         uint256 r1,
         uint256 shares
     ) public view returns (bool valid) {
+        if (shares == 0) return r0 == 0 && r1 == 0;
+
         uint256 scale0 = PRBMathUD60x18.div(PRBMathUD60x18.div(r0, shares), 10**baseScaleFactor);
         uint256 scale1 = PRBMathUD60x18.div(PRBMathUD60x18.div(r1, shares), 10**speculativeScaleFactor);
 
@@ -160,9 +162,9 @@ contract Pair is IPair {
 
         uint256 amount0 = PRBMath.mulDiv(r0, liquidity, _totalSupply);
         uint256 amount1 = PRBMath.mulDiv(r1, liquidity, _totalSupply);
-        if (!verifyInvariant(amount0, amount1, liquidity)) revert InvariantError();
-
         if (amount0 == 0 && amount1 == 0) revert InsufficientOutputError();
+
+        if (!verifyInvariant(r0 - amount0, r1 - amount1, _totalSupply - liquidity)) revert InvariantError();
         _burn(liquidity);
         _update(r0 - amount0, r1 - amount1);
 
