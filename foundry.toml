@@ -14,3 +14,11 @@ test = "test"
 [profile.ci]
 fuzz_runs = 1_000
 verbosity = 4
+
+[rpc_endpoints]
+arbitrum = "${RPC_URL_ARBITRUM}"
+goerli = "${RPC_URL_GOERLI}"
+
+[etherscan]
+arbitrum = { key = "${ARBISCAN_KEY}", url = "https://api.arbiscan.io/api" }
+goerli = { key = "${ETHERSCAN_KEY}", url = "https://api-goerli.etherscan.io/api" }
