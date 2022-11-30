@@ -6,6 +6,8 @@ import "forge-std/console2.sol";
 
 import { Factory } from "../src/Factory.sol";
 import { CREATE3Factory } from "create3-factory/CREATE3Factory.sol";
+import { Pair } from "../src/Pair.sol";
+import { Lendgine } from "../src/Lendgine.sol";
 
 contract DeployScript is Script {
     function run() public returns (Factory deployed) {
@@ -15,5 +17,8 @@ contract DeployScript is Script {
         vm.broadcast(pk);
 
         deployed = Factory(create3.deploy(keccak256("Numoen Factory"), type(Factory).creationCode));
+
+        console2.log("Lendgine initcode hash:", uint256(keccak256(type(Lendgine).creationCode)));
+        console2.log("Pair initcode hash:", uint256(keccak256(type(Pair).creationCode)));
     }
 }
