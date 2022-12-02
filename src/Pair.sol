@@ -11,6 +11,8 @@ import { SafeCast } from "./libraries/SafeCast.sol";
 import { PRBMathUD60x18 } from "prb-math/PRBMathUD60x18.sol";
 import { PRBMath } from "prb-math/PRBMath.sol";
 
+import "forge-std/console2.sol";
+
 contract Pair is IPair {
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -140,7 +142,7 @@ contract Pair is IPair {
 
         if (scale1 > 2 * upperBound) revert SpeculativeInvariantError();
 
-        return a + b == c + d;
+        return a + b >= c + d;
     }
 
     /// @inheritdoc IPair

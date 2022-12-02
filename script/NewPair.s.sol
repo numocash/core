@@ -8,10 +8,10 @@ import { Lendgine } from "../src/Lendgine.sol";
 
 contract DeployScript is Script {
     function run() public {
-        address factory = 0x2A4a8ea165aa1d7F45d7ac03BFd6Fa58F9F5F8CC;
-        address base = 0x765DE816845861e75A25fCA122bb6898B8B1282a;
-        address speculative = 0x73a210637f6F6B7005512677Ba6B3C96bb4AA44B;
-        uint256 upperBound = 0.001 ether;
+        address factory = 0xd7a59E4D53f08AE80F8776044A764d97cd96DEcB;
+        address base = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
+        address speculative = 0x6C2C06790b3E3E3c38e12Ee22F8183b37a13EE55;
+        uint256 upperBound = .8 ether;
 
         uint256 pk = vm.envUint("PRIVATE_KEY");
         vm.broadcast(pk);

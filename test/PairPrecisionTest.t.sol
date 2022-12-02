@@ -12,7 +12,7 @@ import { Pair } from "../src/Pair.sol";
 import { PRBMath } from "prb-math/PRBMath.sol";
 import { PRBMathUD60x18 } from "prb-math/PRBMathUD60x18.sol";
 
-contract InvariantTest is TestHelper {
+contract PrecisionTest is TestHelper {
     uint256 public constant maxTokens = type(uint256).max;
 
     function setUp() public {
@@ -54,11 +54,18 @@ contract InvariantTest is TestHelper {
         uint256 price,
         uint256 liquidity,
         uint256 _upperBound
-    ) public pure returns (uint256 r0, uint256 r1) {
-        uint256 scale0 = PRBMathUD60x18.powu(price, 2);
+    ) public view returns (uint256 r0, uint256 r1) {
+        console2.log("price", price);
+        uint256 r0;
+        if (price > 10**12) {
+            uint256 scale0 = PRBMathUD60x18.powu(price, 2);
+            r0 = PRBMathUD60x18.mul(scale0, liquidity) + 1;
+        } else {
+            r0 = PRBMath.mulDiv(price * price, liquidity, 10**36) + 1;
+        }
         uint256 scale1 = 2 * (_upperBound - price);
 
-        return (PRBMathUD60x18.mul(scale0, liquidity), PRBMathUD60x18.mul(scale1, liquidity));
+        return (r0, PRBMathUD60x18.mul(scale1, liquidity) + 1);
     }
 
     function priceToLPValue(uint256 price, uint256 _upperBound) public returns (uint256 value) {
@@ -67,9 +74,9 @@ contract InvariantTest is TestHelper {
     }
 
     function testPricePrecision() public {
-        uint256 price = 10**9 + 1;
-        uint256 r0 = (price**2);
-        uint256 r1 = 2 * (upperBound - price * 10**9);
+        uint256 price = 10**8 + 352352352;
+        (uint256 r0, uint256 r1) = priceToReserves(price, 1 ether, upperBound);
+
         _pairMint(r0, r1, 1 ether, cuh);
     }
 
@@ -97,6 +104,7 @@ contract InvariantTest is TestHelper {
         uint256 conversion = 1 ether; // base to $ scaled
 
         (uint256 r0, uint256 r1) = priceToReserves(price, liquidity, upperBound);
+        console2.log(r0, r1);
         uint256 value = priceToLPValue(price, upperBound);
         _pairMint(r0, r1, liquidity, cuh);
 
@@ -179,25 +187,26 @@ contract InvariantTest is TestHelper {
         console2.log("max TVL of pool in $", PRBMath.mulDiv(value, maxTokens, conversion * 1 ether));
     }
 
-    // function testLowConversionBaseline() public {
-    //     // 10**-6 base tokens = $1
-    //     // 10**3 speculative tokens = $1
-    //     uint256 _upperBound = 10**(18 - 9);
-    //     (, address _pair) = factory.createLendgine(address(base), address(speculative), 18, 18, _upperBound);
-    //     Pair pair = Pair(_pair);
+    function testLowConversionBaseline() public {
+        // 10**-6 base tokens = $1
+        // 10**3 speculative tokens = $1
+        uint256 _upperBound = 10**(18 - 9);
+        (, address _pair) = factory.createLendgine(address(base), address(speculative), 18, 18, _upperBound);
+        Pair pair = Pair(_pair);
 
-    //     uint256 liquidity = 1 ether;
-    //     uint256 price = _upperBound / 10;
-    //     uint256 conversion = 10**(18 - 6);
+        uint256 liquidity = 10**18;
+        uint256 price = _upperBound / 10;
+        uint256 conversion = 10**(18 - 6);
 
-    //     (uint256 r0, uint256 r1) = priceToReserves(price, liquidity, _upperBound);
+        (uint256 r0, uint256 r1) = priceToReserves(price, liquidity, _upperBound);
+        console2.log(r0, r1);
 
-    //     uint256 value = priceToLPValue(price, _upperBound);
-    //     _pairMint(r0, r1, liquidity, cuh, pair);
+        uint256 value = priceToLPValue(price, _upperBound);
+        _pairMint(r0, r1, liquidity, cuh, pair);
 
-    //     console2.log("price of 1 ether LP in $:", value / conversion);
-    //     console2.log("max TVL of pool in $", PRBMath.mulDiv(value, maxTokens, conversion * 1 ether));
-    // }
+        console2.log("price of 1 ether LP in $:", value / conversion);
+        console2.log("max TVL of pool in $", PRBMath.mulDiv(value, maxTokens, conversion * 1 ether));
+    }
 
     function testLowConversionPriceMax() public {
         // 10**-6 base tokens = $1
