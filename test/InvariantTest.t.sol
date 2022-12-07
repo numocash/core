@@ -22,42 +22,51 @@ contract InvariantTest is TestHelper {
 
         assertEq(pair.totalSupply(), 1 ether);
         assertEq(pair.buffer(), 1 ether);
+
+        pair.burn(cuh, 1 ether);
+
+        assertEq(base.balanceOf(cuh), 9 ether);
+        assertEq(speculative.balanceOf(cuh), 4 ether);
+    }
+
+    function testTooLargeLiquidityMint() public {
+        base.mint(cuh, 9 ether);
+        speculative.mint(cuh, 4 ether);
+
+        vm.prank(cuh);
+        base.transfer(address(pair), 9 ether);
+
+        vm.prank(cuh);
+        speculative.transfer(address(pair), 4 ether);
+
+        vm.expectRevert(Pair.InvariantError.selector);
+        pair.mint(1 ether + 1);
+    }
+
+    function testTooSmallLiquidityMint() public {
+        _pairMint(9 ether, 4 ether, 1 ether - 1, cuh);
+    }
+
+    function testTooSmallLiquidityBurn() public {
+        _pairMint(9 ether, 4 ether, 1 ether, cuh);
+
+        pair.burn(cuh, 1 ether - 1);
+
+        assertFalse(base.balanceOf(cuh) == 9 ether);
+        assertFalse(speculative.balanceOf(cuh) == 4 ether);
+
+        pair.burn(cuh, 1);
+
+        assertEq(base.balanceOf(cuh), 9 ether);
+        assertEq(speculative.balanceOf(cuh), 4 ether);
     }
 
     function testBaseUpperBound() public {
-        _pairMint(25 ether, 0, 1 ether, cuh);
+        _pairMint(25 ether, 1, 1 ether, cuh);
     }
 
     function testSpeculativeUpperBound() public {
-        _pairMint(0 ether, 2 * upperBound, 1 ether, cuh);
-    }
-
-    function testTooLargeScale() public {
-        base.mint(cuh, 9 ether);
-        speculative.mint(cuh, 4 ether);
-
-        vm.prank(cuh);
-        base.transfer(address(pair), 9 ether);
-
-        vm.prank(cuh);
-        speculative.transfer(address(this), 4 ether);
-
-        vm.expectRevert(Pair.InvariantError.selector);
-        pair.mint(1 ether);
-    }
-
-    function testTooSmallScale() public {
-        base.mint(cuh, 9 ether);
-        speculative.mint(cuh, 4 ether);
-
-        vm.prank(cuh);
-        base.transfer(address(pair), 9 ether);
-
-        vm.prank(cuh);
-        speculative.transfer(address(this), 4 ether);
-
-        vm.expectRevert(Pair.InvariantError.selector);
-        pair.mint(1 ether);
+        _pairMint(1, 2 * upperBound, 1 ether, cuh);
     }
 
     function testSpeculativeUpperBound2() public {
@@ -70,54 +79,6 @@ contract InvariantTest is TestHelper {
 
     function testSmallScale() public {
         _pairMint(1_000_000, 8_000_000, 1_000_000, cuh);
-    }
-
-    function testDivideToZero() public {
-        base.mint(cuh, 9 ether);
-        speculative.mint(cuh, 4 ether);
-
-        vm.prank(cuh);
-        base.transfer(address(pair), 9 ether);
-
-        vm.prank(cuh);
-        speculative.transfer(address(this), 4 ether);
-
-        vm.expectRevert(Pair.InvariantError.selector);
-        pair.mint(1 ether);
-    }
-
-    function testDivideByZero() public {
-        base.mint(cuh, 9 ether);
-        speculative.mint(cuh, 4 ether);
-
-        vm.prank(cuh);
-        base.transfer(address(pair), 9 ether);
-
-        vm.prank(cuh);
-        speculative.transfer(address(this), 4 ether);
-
-        vm.expectRevert(Pair.InsufficientOutputError.selector);
-        pair.mint(0 ether);
-    }
-
-    function testSpeculativeInvariantError() public {
-        speculative.mint(cuh, 2 * upperBound + 1);
-
-        vm.prank(cuh);
-        speculative.transfer(address(pair), 2 * upperBound + 1);
-
-        vm.expectRevert(Pair.SpeculativeInvariantError.selector);
-        pair.mint(1 ether);
-    }
-
-    function testBaseInvariantError() public {
-        base.mint(cuh, 25 ether + 1);
-
-        vm.prank(cuh);
-        base.transfer(address(pair), 25 ether + 1);
-
-        vm.expectRevert(Pair.InvariantError.selector);
-        pair.mint(1 ether);
     }
 
     function testBurnAmount() public {
@@ -160,7 +121,7 @@ contract InvariantTest is TestHelper {
         assertEq(speculative.balanceOf(cuh), 8 ether);
     }
 
-    function testSwapBForS1() public {
+    function testSwapBForS() public {
         uint256 rB = 1 ether;
         uint256 rS = 8 ether;
         _pairMint(rB, rS, 1 ether, cuh);
@@ -175,11 +136,11 @@ contract InvariantTest is TestHelper {
 
         uint256 amountBIn = a + b - c;
 
-        base.mint(cuh, amountBIn);
+        base.mint(cuh, amountBIn + 1);
         console2.log(amountBIn);
 
         vm.prank(cuh);
-        base.transfer(address(pair), amountBIn);
+        base.transfer(address(pair), amountBIn + 1);
 
         console2.log("quote price", 1 ether);
         console2.log("trade price", (amountBIn * 1 ether) / amountSOut);
@@ -187,33 +148,77 @@ contract InvariantTest is TestHelper {
         pair.swap(cuh, 0, amountSOut);
     }
 
-    function testSwapBForS2() public {
+    function testSwapBForSDown() public {
         uint256 rB = 1 ether;
         uint256 rS = 8 ether;
         _pairMint(rB, rS, 1 ether, cuh);
 
-        uint256 amountBOut = 10000025000000 - 50000000;
+        uint256 amountSOut = 0.00001 ether;
 
-        uint256 a = 2 * upperBound - rS;
+        uint256 a = PRBMathUD60x18.mul(amountSOut, upperBound);
 
-        uint256 b = 4 * amountBOut;
+        uint256 b = PRBMathUD60x18.powu(amountSOut, 2) / 4;
 
-        uint256 c = PRBMathUD60x18.sqrt(PRBMathUD60x18.powu(a, 2) - b);
+        uint256 c = PRBMathUD60x18.mul(amountSOut, rS) / 2;
 
-        uint256 amountSIn = a - c;
+        uint256 amountBIn = a + b - c;
 
-        console2.log("base out", amountBOut);
-        console2.log("spec in", amountSIn);
-
-        console2.log("quote price", 1 ether);
-        console2.log("trade price", (amountBOut * 1 ether) / amountSIn);
-
-        speculative.mint(cuh, amountSIn);
+        base.mint(cuh, amountBIn - 1);
+        console2.log(amountBIn);
 
         vm.prank(cuh);
-        speculative.transfer(address(pair), amountSIn);
+        base.transfer(address(pair), amountBIn - 1);
 
-        pair.swap(cuh, amountBOut, 0);
+        console2.log("quote price", 1 ether);
+        console2.log("trade price", (amountBIn * 1 ether) / amountSOut);
+
+        vm.expectRevert(Pair.InvariantError.selector);
+        pair.swap(cuh, 0, amountSOut);
+    }
+
+    function priceToReserves(
+        uint256 price,
+        uint256 liquidity,
+        uint256 _upperBound
+    ) public view returns (uint256 r0, uint256 r1) {
+        uint256 r0;
+        if (price > 10**12) {
+            uint256 scale0 = PRBMathUD60x18.powu(price, 2);
+            r0 = PRBMathUD60x18.mul(scale0, liquidity) + 1;
+        } else {
+            r0 = PRBMath.mulDiv(price * price, liquidity, 10**36) + 1;
+        }
+        uint256 scale1 = 2 * (_upperBound - price);
+
+        return (r0, PRBMathUD60x18.mul(scale1, liquidity) + 1);
+    }
+
+    function testSwapBForSRandom() public {
+        uint256 liquidity = 42834 * 10**12;
+        (uint256 rB, uint256 rS) = priceToReserves(.02342 ether, liquidity, upperBound);
+        _pairMint(rB, rS, liquidity, cuh);
+
+        uint256 amountSOut = 0.00001 ether;
+
+        uint256 scaleSOut = PRBMathUD60x18.div(amountSOut, liquidity);
+        uint256 scale1 = PRBMathUD60x18.div(rS, liquidity);
+
+        uint256 a = PRBMathUD60x18.mul(scaleSOut, upperBound);
+        uint256 b = PRBMathUD60x18.powu(scaleSOut, 2) / 4;
+        uint256 c = PRBMathUD60x18.mul(scaleSOut, scale1) / 2;
+
+        uint256 amountBIn = PRBMathUD60x18.mul(a + b - c, liquidity) + 1;
+
+        base.mint(cuh, amountBIn);
+        console2.log(amountBIn);
+
+        vm.prank(cuh);
+        base.transfer(address(pair), amountBIn);
+
+        console2.log("quote price", .02342 ether);
+        console2.log("trade price", (amountBIn * 1 ether) / amountSOut);
+
+        pair.swap(cuh, 0, amountSOut);
     }
 
     function testSwapUpperBound() public {
